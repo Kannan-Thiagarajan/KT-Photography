@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth/session';
 import { ActionForm, Field, TextArea } from '@/components/ui/action-form';
@@ -34,15 +35,9 @@ export default async function AlbumDetail({
     .from('photos')
     .select('*', { count: 'exact' })
     .eq('album_id', id)
-    .order('created_at', { ascending: false })
+    .order('display_order', { ascending: true })
     .range((page - 1) * size, page * size - 1);
   if (photoError) throw new Error('Unable to load photographs.');
-  const { data: covers } = await db
-    .from('photos')
-    .select('thumbnail_path,filename')
-    .eq('album_id', id)
-    .order('created_at', { ascending: false })
-    .limit(100);
   return (
     <>
       <Link href="/admin/albums" className="back-link">
@@ -77,30 +72,34 @@ export default async function AlbumDetail({
             <input type="hidden" name="id" value={id} />
             <Field label="Title" name="title" defaultValue={album.title} />
             <TextArea label="Description" name="description" defaultValue={album.description} />
-            <label className="field">
-              <span>Cover photograph</span>
-              <select
-                key={album.cover_image_path}
-                name="cover_image_path"
-                defaultValue={album.cover_image_path || ''}
-              >
-                <option value="">No cover</option>
-                {album.cover_image_path &&
-                  !covers?.some((p) => p.thumbnail_path === album.cover_image_path) && (
-                    <option value={album.cover_image_path}>Current cover</option>
-                  )}
-                {covers?.map((p) => (
-                  <option value={p.thumbnail_path} key={p.thumbnail_path}>
-                    {p.filename}
-                  </option>
-                ))}
-              </select>
-            </label>
           </ActionForm>
+          <div className="album-cover-settings">
+            <h3>Album cover</h3>
+            {album.cover_image_path && (
+              <Image
+                key={album.cover_image_path}
+                src={`/api/albums/${id}/cover`}
+                alt="Current album cover"
+                width={420}
+                height={150}
+                unoptimized
+              />
+            )}
+            <p>
+              Choose <strong>Use as cover</strong> on any photograph below. It saves immediately and
+              appears on your client&apos;s gallery home.
+            </p>
+          </div>
         </section>
       </div>
       {photos?.length ? (
-        <PhotoGrid photos={photos} admin />
+        <PhotoGrid
+          photos={photos}
+          admin
+          coverPath={album.cover_image_path}
+          offset={(page - 1) * size}
+          total={count || 0}
+        />
       ) : (
         <section className="panel">
           <EmptyState

@@ -27,7 +27,11 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
         (
           await db
             .from('albums')
-            .update({ title, description, cover_image_path: cover })
+            .update({
+              title,
+              description,
+              ...(data.has('cover_image_path') ? { cover_image_path: cover } : {}),
+            })
             .eq('id', id)
         ).error,
       );

@@ -26,7 +26,7 @@ export default async function ClientAlbum({
     .from('photos')
     .select('*', { count: 'exact' })
     .eq('album_id', id)
-    .order('created_at', { ascending: true })
+    .order('display_order', { ascending: true })
     .range((page - 1) * size, page * size - 1);
   if (photoError) throw new Error('Unable to load photographs.');
   return (

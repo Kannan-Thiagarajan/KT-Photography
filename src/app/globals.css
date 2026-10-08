@@ -1727,6 +1727,113 @@ ul {
 .photo-tile-footer .button {
   padding: 7px;
 }
+.photo-management-heading {
+  margin: 24px 0 18px;
+}
+.photo-management-heading h2 {
+  font-family: var(--font-heading);
+  font-size: 25px;
+  font-weight: 400;
+}
+.photo-management-heading p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 720px;
+  margin-top: 8px;
+}
+.photo-edit-controls {
+  border-top: 1px solid var(--line);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+.photo-cover-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--gold);
+  font-size: 11px;
+}
+.photo-cover-button.selected {
+  background: #d9b87b18;
+  border-color: #d9b87b66;
+  opacity: 1;
+}
+.photo-order-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.photo-order-controls .icon-button,
+.photo-drag-handle {
+  min-width: 32px;
+  min-height: 38px;
+}
+.photo-drag-handle {
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: grab;
+}
+.photo-dragging {
+  opacity: 0.5;
+}
+.photo-position-form {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-width: 86px;
+}
+.photo-position-form input {
+  min-width: 0;
+  width: 48px;
+  flex: 1;
+  background: #17111b;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 5px;
+  font-size: 11px;
+}
+.photo-position-form button {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gold);
+  font-size: 10px;
+  padding: 6px;
+  min-height: 38px;
+}
+.album-cover-settings {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.album-cover-settings h3 {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.album-cover-settings img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 5px;
+  margin-bottom: 12px;
+}
+.album-cover-settings p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
 .pagination {
   display: flex;
   align-items: center;

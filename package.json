@@ -11,6 +11,7 @@
     "bootstrap:admin": "node --env-file=.env.local scripts/bootstrap-admin.mjs",
     "test": "node --env-file=.env.local --test tests/*.test.mjs",
     "test:e2e": "node --env-file=.env.local tests/e2e.mjs",
+    "test:photos": "node --env-file=.env.local tests/photo-management.e2e.mjs",
     "test:quotation": "node --test tests/quotation.test.mjs && node tests/quotation.e2e.mjs",
     "format": "prettier --write src scripts tests *.json *.ts *.mjs"
   },

@@ -26,6 +26,7 @@ export type Photo = {
   file_size: number;
   width: number;
   height: number;
+  display_order: number;
   created_at: string;
 };
 export type Package = {

@@ -199,7 +199,11 @@ try {
   await clientPage.waitForURL(`${base}/account`);
   console.log('PASS: Access revocation and admin password reset affect existing sessions.');
   await page.goto(`${base}/admin/albums/${albumId}`);
-  await page.getByRole('button', { name: 'Delete photograph' }).first().click();
+  await page
+    .locator('article')
+    .filter({ has: page.getByRole('button', { name: 'Preview portrait.png', exact: true }) })
+    .getByRole('button', { name: 'Delete photograph' })
+    .click();
   await page.getByRole('button', { name: 'Delete permanently' }).click();
   await page.getByRole('button', { name: 'Preview portrait.png' }).waitFor({ state: 'detached' });
   const { count } = await db

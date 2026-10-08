@@ -123,6 +123,7 @@ export type Database = {
       };
       photos: {
         Row: {
+          display_order: number;
           album_id: string;
           created_at: string;
           file_size: number;
@@ -134,6 +135,7 @@ export type Database = {
           width: number;
         };
         Insert: {
+          display_order?: number;
           album_id: string;
           created_at?: string;
           file_size: number;
@@ -145,6 +147,7 @@ export type Database = {
           width: number;
         };
         Update: {
+          display_order?: number;
           album_id?: string;
           created_at?: string;
           file_size?: number;
@@ -248,7 +251,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      move_album_photo: {
+        Args: { p_photo_id: string; p_target_position: number };
+        Returns: string;
+      };
     };
     Enums: {
       [_ in never]: never;

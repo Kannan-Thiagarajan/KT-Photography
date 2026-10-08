@@ -89,6 +89,10 @@ Sign in at `/login`. Each new admin must change the initial password before acce
 6. The client changes the initial password, then sees their own paginated albums. They can preview, navigate and download individual originals.
 7. Use a client's profile to update their name/email, disable access, or manually reset their password. Resetting forces another password change and may invalidate their session. Share the new password manually.
 
+Inside an album, use each photograph's **Use as cover** button to choose the thumbnail shown on the client's gallery home. It saves immediately; **Current cover** identifies the selected photo, and Album details keeps a preview. Saving the title or description preserves the cover. If the selected photograph is deleted, the first remaining photo becomes the cover.
+
+Photo order can be changed with drag handles on desktop, earlier/later arrows, or the numbered position field on desktop and mobile. Moves save immediately and the client's gallery uses the same order. Position numbers apply across the whole album, including other pages. New uploads append after the existing photographs; existing albums keep their prior client-visible order when the migration is applied. Album photos stay private; choosing a cover does not publish one on the public landing page.
+
 Public packages can be added, edited or hidden in **Collections**, including their images. The original five collections and exact prices/inclusions are seeded from the supplied Google Sites reference. Public pages refresh every two minutes and immediately when saved through the studio.
 
 The public collection planner includes the reference's three-step finder, selectable package cards, coverage calculator, second-photographer options, client/event details and official quotation estimate. Clients can print/save the estimate as a PDF, copy it, or open a prefilled WhatsApp message to Kannan. Quotes stay in browser memory and do not create a booking or send anything automatically. Full/mobile planner previews, package guidance, all reference pricing FAQs and the original KT hero artwork are included. See [the reference audit](docs/reference-parity.md).
@@ -114,6 +118,7 @@ npm run build
 npm test
 # Run a local server before this command; Chrome must be installed.
 npm run test:e2e
+npm run test:photos
 # Optional: TEST_BASE_URL=http://localhost:3001 for a production server.
 npm audit --omit=dev
 ```
