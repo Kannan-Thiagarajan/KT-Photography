@@ -1742,56 +1742,123 @@ ul {
   max-width: 720px;
   margin-top: 8px;
 }
-.photo-edit-controls {
-  border-top: 1px solid var(--line);
-  padding: 10px;
-  display: grid;
-  gap: 8px;
+.admin-photo-tile {
+  position: relative;
+  overflow: visible;
 }
-.photo-cover-button {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--gold);
-  font-size: 11px;
+.admin-photo-tile:has(.photo-options-menu) {
+  z-index: 10;
 }
-.photo-cover-button.selected {
-  background: #d9b87b18;
-  border-color: #d9b87b66;
-  opacity: 1;
+.admin-photo-tile .photo-image-button {
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
 }
-.photo-order-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
+.admin-photo-tile .photo-tile-footer {
+  padding: 5px 7px;
+  gap: 5px;
 }
-.photo-order-controls .icon-button,
-.photo-drag-handle {
-  min-width: 32px;
-  min-height: 38px;
+.admin-photo-tile .photo-tile-footer > span {
+  flex: 1;
 }
 .photo-drag-handle {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
   display: grid;
   place-items: center;
   border: 0;
   color: var(--muted);
   background: transparent;
   cursor: grab;
+  touch-action: none;
+  border-radius: 4px;
+}
+.photo-drag-handle:hover,
+.photo-options-trigger:hover {
+  background: #d9b87b12;
+  color: var(--gold);
+}
+.photo-drag-handle:active {
+  cursor: grabbing;
 }
 .photo-dragging {
-  opacity: 0.5;
+  opacity: 0.3;
+}
+.photo-drag-overlay {
+  box-shadow: 0 15px 40px #0008;
+  cursor: grabbing;
+}
+.photo-drag-overlay > img {
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+}
+.photo-cover-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  pointer-events: none;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 5px 8px;
+  font-size: 10px;
+  background: #211b25ed;
+  color: var(--gold);
+  border: 1px solid #d9b87b66;
+  border-radius: 4px;
+}
+.photo-options {
+  flex-shrink: 0;
+}
+.photo-options-trigger {
+  min-width: 44px;
+  min-height: 44px;
+}
+.photo-options-menu {
+  position: absolute;
+  right: 7px;
+  bottom: 55px;
+  width: 215px;
+  padding: 6px;
+  background: #2a202f;
+  border: 1px solid #d9b87b44;
+  border-radius: 7px;
+  box-shadow: 0 12px 30px #0007;
+}
+.photo-options-menu > button {
+  width: 100%;
+  padding: 11px 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+}
+.photo-options-menu > button:hover {
+  background: #d9b87b16;
+}
+.photo-options-menu > button.photo-menu-delete {
+  color: #f59c9c;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
 }
 .photo-position-form {
+  padding: 5px 9px 12px;
+}
+.photo-position-form label {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.photo-position-form > div {
   display: flex;
-  flex: 1;
-  gap: 4px;
-  min-width: 86px;
+  gap: 6px;
 }
 .photo-position-form input {
   min-width: 0;
@@ -2965,6 +3032,13 @@ ul {
   }
   .photo-grid {
     gap: 11px;
+  }
+  .admin-photo-tile:nth-child(odd) .photo-options-menu {
+    right: auto;
+    left: 7px;
+  }
+  .photo-drag-overlay > img {
+    height: 190px;
   }
   .photo-image-button {
     height: 190px;

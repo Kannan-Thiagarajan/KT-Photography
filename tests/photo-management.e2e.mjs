@@ -32,15 +32,13 @@ async function user(role) {
   users.push(value.id);
   assert.ifError(
     (
-      await service
-        .from('profiles')
-        .insert({
-          id: value.id,
-          email,
-          full_name: `Order test ${role}`,
-          role,
-          must_change_password: false,
-        })
+      await service.from('profiles').insert({
+        id: value.id,
+        email,
+        full_name: `Order test ${role}`,
+        role,
+        must_change_password: false,
+      })
     ).error,
   );
   return { id: value.id, email };
@@ -56,6 +54,30 @@ async function expectFirst(page, filename) {
   await expect(
     page.locator('.photo-grid article').first().locator('.photo-tile-footer > span'),
   ).toHaveText(filename, { timeout: 15000 });
+}
+async function options(page, filename) {
+  await page.getByRole('button', { name: `Photo options: ${filename}`, exact: true }).click();
+}
+async function movePosition(page, filename, position) {
+  await options(page, filename);
+  await page.getByRole('button', { name: 'Move to position…', exact: true }).click();
+  await page.getByLabel(`Position for ${filename}`, { exact: true }).fill(String(position));
+  await page.getByRole('button', { name: `Move ${filename} to position`, exact: true }).click();
+  await page.getByRole('status').filter({ hasText: 'Photo order saved' }).waitFor();
+}
+async function drag(page, filename, target) {
+  const handle = page.getByRole('button', { name: `Drag to reorder ${filename}`, exact: true });
+  await expect(handle).toBeEnabled();
+  await handle.scrollIntoViewIfNeeded();
+  const from = await handle.boundingBox();
+  const to = await page
+    .getByRole('button', { name: `Drag to reorder ${target}`, exact: true })
+    .boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 10, from.y + from.height / 2, { steps: 3 });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 15 });
+  await page.mouse.up();
 }
 try {
   const admin = await user('admin'),
@@ -77,13 +99,6 @@ try {
     const filename = `photo-${String(i).padStart(2, '0')}.webp`;
     const path = `${client.id}/${albumId}/${filename}`;
     paths.push(path);
-    assert.ifError(
-      (
-        await service.storage
-          .from('client-photos')
-          .upload(path, bytes, { contentType: 'image/webp', cacheControl: '0' })
-      ).error,
-    );
     rows.push({
       album_id: albumId,
       filename,
@@ -93,6 +108,19 @@ try {
       width: 60,
       height: 50,
     });
+  }
+  for (let index = 0; index < paths.length; index += 6) {
+    await Promise.all(
+      paths.slice(index, index + 6).map(async (path) => {
+        assert.ifError(
+          (
+            await service.storage
+              .from('client-photos')
+              .upload(path, bytes, { contentType: 'image/webp', cacheControl: '0' })
+          ).error,
+        );
+      }),
+    );
   }
   const inserted = await service.from('photos').insert(rows).select();
   assert.ifError(inserted.error);
@@ -106,10 +134,10 @@ try {
   adminPage.on('pageerror', (e) => errors.push(e.message));
   await signIn(adminPage, admin.email);
   await adminPage.goto(`${base}/admin/albums/${albumId}?page=2`);
-  await adminPage.getByRole('button', { name: 'Use as cover: photo-26.webp', exact: true }).click();
-  await adminPage
-    .getByRole('button', { name: 'Current cover: photo-26.webp', exact: true })
-    .waitFor();
+  await options(adminPage, 'photo-26.webp');
+  await adminPage.getByRole('button', { name: 'Make cover image', exact: true }).click();
+  await adminPage.getByRole('status').filter({ hasText: 'Album cover saved' }).waitFor();
+  await expect(adminPage.locator('[aria-label="Current cover: photo-26.webp"]')).toBeVisible();
   assert.equal(
     (await service.from('albums').select('cover_image_path').eq('id', albumId).single()).data
       .cover_image_path,
@@ -119,21 +147,44 @@ try {
   await adminPage.getByRole('button', { name: 'Save changes', exact: true }).click();
   await adminPage.getByRole('status').filter({ hasText: 'Album saved' }).waitFor();
   await adminPage.reload();
-  await adminPage
-    .getByRole('button', { name: 'Current cover: photo-26.webp', exact: true })
-    .waitFor();
+  await expect(adminPage.locator('[aria-label="Current cover: photo-26.webp"]')).toBeVisible();
   await adminPage.getByAltText('Current album cover').evaluate((img) => img.decode());
   console.log(
     'PASS: Second-page cover selection saves immediately and survives detail edits/reloads.',
   );
-  await adminPage.getByLabel('Position for photo-26.webp', { exact: true }).fill('1');
-  await adminPage
-    .getByRole('button', { name: 'Move photo-26.webp to position', exact: true })
-    .click();
-  await adminPage.getByRole('status').filter({ hasText: 'Photo order saved' }).waitFor();
+  await movePosition(adminPage, 'photo-26.webp', 1);
   await adminPage.goto(`${base}/admin/albums/${albumId}`);
   await expectFirst(adminPage, 'photo-26.webp');
-  await adminPage.getByRole('button', { name: 'Move photo-26.webp later', exact: true }).click();
+  const imageRequests = [];
+  const recordImage = (request) => {
+    if (request.url().includes('/api/photos/')) imageRequests.push(request.url());
+  };
+  adminPage.on('request', recordImage);
+  await adminPage.reload();
+  await adminPage.locator('.photo-grid img').evaluateAll(async (images) => {
+    await Promise.all(
+      images.map((image) => {
+        image.loading = 'eager';
+        return image.decode();
+      }),
+    );
+  });
+  assert.equal(imageRequests.length, 0, 'Preview links are batched; no individual API requests.');
+  assert.match(
+    await adminPage.locator('.photo-grid img').first().getAttribute('src'),
+    /\/storage\/v1\/object\/sign\//,
+  );
+  adminPage.off('request', recordImage);
+  assert.equal(
+    await adminPage.getByRole('button', { name: /Move .* earlier|Move .* later/ }).count(),
+    0,
+  );
+  await options(adminPage, 'photo-26.webp');
+  await adminPage.keyboard.press('Escape');
+  await expect(
+    adminPage.getByRole('button', { name: 'Photo options: photo-26.webp', exact: true }),
+  ).toHaveAttribute('aria-expanded', 'false');
+  await drag(adminPage, 'photo-26.webp', 'photo-01.webp');
   await adminPage.getByRole('status').filter({ hasText: 'Photo order saved' }).waitFor();
   assert.equal(
     (
@@ -148,38 +199,97 @@ try {
     'photo-01.webp',
   );
   await expectFirst(adminPage, 'photo-01.webp');
-  await adminPage.getByRole('button', { name: 'Move photo-26.webp earlier', exact: true }).click();
+  const handle = adminPage.getByRole('button', {
+    name: 'Drag to reorder photo-26.webp',
+    exact: true,
+  });
+  await handle.focus();
+  await adminPage.keyboard.press('Space');
+  await expect(adminPage.locator('.photo-drag-overlay')).toBeVisible();
+  await adminPage.keyboard.press('ArrowLeft');
+  await expect(adminPage.locator('[id^="DndLiveRegion"]')).toContainText(
+    `was moved over droppable area ${photos[0].id}`,
+  );
+  await adminPage.keyboard.press('Space');
   await adminPage.getByRole('status').filter({ hasText: 'Photo order saved' }).waitFor();
   await expectFirst(adminPage, 'photo-26.webp');
-  await adminPage
-    .getByRole('button', { name: 'Drag to reorder photo-26.webp', exact: true })
-    .dragTo(
-      adminPage
-        .locator('article')
-        .filter({
-          has: adminPage.getByRole('button', { name: 'Preview photo-02.webp', exact: true }),
-        }),
-    );
+  await adminPage.route(`${base}/admin/albums/${albumId}`, (route) => {
+    if (route.request().method() === 'POST')
+      return route.fulfill({ status: 500, body: 'Temporary save failure' });
+    return route.continue();
+  });
+  await drag(adminPage, 'photo-26.webp', 'photo-01.webp');
+  await expect(adminPage.locator('.photo-management-heading [role="alert"]')).toContainText(
+    'Unable to save',
+  );
+  await expectFirst(adminPage, 'photo-26.webp');
+  await adminPage.unroute(`${base}/admin/albums/${albumId}`);
+  await drag(adminPage, 'photo-26.webp', 'photo-02.webp');
   await adminPage.getByRole('status').filter({ hasText: 'Photo order saved' }).waitFor();
   await adminPage.reload();
   await expectFirst(adminPage, 'photo-01.webp');
   console.log(
-    'PASS: Cross-page position moves, earlier/later arrows, desktop drag and persistence.',
+    'PASS: Batched previews, three-dot menu, cross-page moves, mouse/keyboard dragging and persistence.',
   );
-  await adminPage.setViewportSize({ width: 390, height: 844 });
-  await adminPage.getByLabel('Position for photo-26.webp', { exact: true }).fill('1');
-  await adminPage
-    .getByRole('button', { name: 'Move photo-26.webp to position', exact: true })
-    .click();
-  await adminPage.getByRole('status').filter({ hasText: 'Photo order saved' }).waitFor();
-  await expectFirst(adminPage, 'photo-26.webp');
-  assert.equal(await adminPage.evaluate(() => document.documentElement.scrollWidth), 390);
+  const mobile = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  mobile.on('pageerror', (error) => errors.push(error.message));
+  await signIn(mobile, admin.email);
+  await mobile.goto(`${base}/admin/albums/${albumId}`);
+  await movePosition(mobile, 'photo-26.webp', 1);
+  await expectFirst(mobile, 'photo-26.webp');
+  const touchHandle = mobile.getByRole('button', {
+    name: 'Drag to reorder photo-26.webp',
+    exact: true,
+  });
+  await touchHandle.scrollIntoViewIfNeeded();
+  const from = await touchHandle.boundingBox();
+  const to = await mobile
+    .getByRole('button', { name: 'Drag to reorder photo-01.webp', exact: true })
+    .boundingBox();
+  const cdp = await mobile.context().newCDPSession(mobile);
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  const end = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  for (let step = 1; step <= 12; step++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        {
+          x: start.x + ((end.x - start.x) * step) / 12,
+          y: start.y + ((end.y - start.y) * step) / 12,
+        },
+      ],
+    });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await mobile.getByRole('status').filter({ hasText: 'Photo order saved' }).waitFor();
+  await expectFirst(mobile, 'photo-01.webp');
+  await movePosition(mobile, 'photo-26.webp', 1);
+  assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth), 390);
+  await options(mobile, 'photo-26.webp');
+  const menuBounds = await mobile.locator('.photo-options-menu').boundingBox();
+  assert.ok(menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= 390);
   fs.mkdirSync('.local', { recursive: true });
-  await adminPage.screenshot({
+  await mobile.locator('img').evaluateAll(async (images) => {
+    await Promise.all(
+      images.map((image) => {
+        image.loading = 'eager';
+        return image.decode();
+      }),
+    );
+  });
+  await mobile.evaluate(() => document.activeElement?.blur());
+  await mobile.screenshot({
     path: '.local/photo-controls-mobile.png',
     fullPage: true,
     animations: 'disabled',
   });
+  await mobile.close();
   const clientPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   clientPage.on('pageerror', (e) => errors.push(e.message));
   await signIn(clientPage, client.email);
@@ -189,6 +299,31 @@ try {
     .evaluate((img) => img.decode());
   await clientPage.getByRole('link', { name: /Photo controls saved/ }).click();
   await expectFirst(clientPage, 'photo-26.webp');
+  let expiredPreview = false,
+    fallbackRequests = 0;
+  const signedPattern = '**/storage/v1/object/sign/client-photos/**';
+  await clientPage.route(signedPattern, (route) => {
+    if (!expiredPreview && new URL(route.request().url()).pathname.endsWith('/photo-02.webp')) {
+      expiredPreview = true;
+      return route.fulfill({ status: 403, body: 'Expired preview link' });
+    }
+    return route.continue();
+  });
+  const fallbackListener = (request) => {
+    if (request.url() === `${base}/api/photos/${photos[1].id}`) fallbackRequests++;
+  };
+  clientPage.on('request', fallbackListener);
+  await clientPage.reload();
+  const expiredImage = clientPage.getByAltText('photo-02.webp', { exact: true });
+  await expiredImage.scrollIntoViewIfNeeded();
+  await expect(expiredImage).toHaveAttribute('src', `/api/photos/${photos[1].id}`);
+  await expiredImage.evaluate((image) => image.decode());
+  assert.ok(
+    expiredPreview && fallbackRequests > 0,
+    'Expired signed preview safely falls back to an authorized request.',
+  );
+  await clientPage.unroute(signedPattern);
+  clientPage.off('request', fallbackListener);
   assert.equal(
     await clientPage.getByRole('button', { name: /Use as cover|Move .*earlier/ }).count(),
     0,
@@ -200,21 +335,21 @@ try {
       .error,
   );
   await owner.auth.signOut();
-  console.log('PASS: Mobile ordering, assigned-client cover/order, and client mutation rejection.');
+  console.log(
+    'PASS: Touch dragging, mobile menu layout, assigned-client cover/order, and mutation rejection.',
+  );
   // Concurrent moves and an append must never lose a photo or reuse an order position.
   const adminDb = signedClient();
   assert.ifError((await adminDb.auth.signInWithPassword({ email: admin.email, password })).error);
   const moved = await Promise.all([
     adminDb.rpc('move_album_photo', { p_photo_id: photos[0].id, p_target_position: 25 }),
     adminDb.rpc('move_album_photo', { p_photo_id: photos[1].id, p_target_position: 0 }),
-    service
-      .from('photos')
-      .insert({
-        ...rows[0],
-        filename: 'append.webp',
-        storage_path: `${client.id}/${albumId}/append.webp`,
-        thumbnail_path: `${client.id}/${albumId}/append-preview.webp`,
-      }),
+    service.from('photos').insert({
+      ...rows[0],
+      filename: 'append.webp',
+      storage_path: `${client.id}/${albumId}/append.webp`,
+      thumbnail_path: `${client.id}/${albumId}/append-preview.webp`,
+    }),
   ]);
   for (const result of moved) assert.ifError(result.error);
   const result = await service
@@ -232,6 +367,7 @@ try {
   assert.deepEqual(errors, []);
   console.log('PASS: Concurrent reorders/uploads retain every photo with unique order positions.');
   await adminPage.reload();
+  await options(adminPage, 'photo-26.webp');
   await adminPage
     .locator('article')
     .filter({ has: adminPage.getByRole('button', { name: 'Preview photo-26.webp', exact: true }) })

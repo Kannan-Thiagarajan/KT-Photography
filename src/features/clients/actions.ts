@@ -75,6 +75,7 @@ export async function updateClient(_: ActionResult, data: FormData): Promise<Act
       .eq('id', id);
     check(error);
     revalidatePath('/admin/clients');
+    revalidatePath(`/admin/clients/${id}`);
     return { success: 'Client updated. Share any new credentials privately.' };
   } catch (error) {
     return { error: message(error) };

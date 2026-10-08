@@ -27,6 +27,7 @@ export type Photo = {
   width: number;
   height: number;
   display_order: number;
+  preview_url?: string;
   created_at: string;
 };
 export type Package = {

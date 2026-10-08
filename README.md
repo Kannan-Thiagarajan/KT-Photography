@@ -89,9 +89,9 @@ Sign in at `/login`. Each new admin must change the initial password before acce
 6. The client changes the initial password, then sees their own paginated albums. They can preview, navigate and download individual originals.
 7. Use a client's profile to update their name/email, disable access, or manually reset their password. Resetting forces another password change and may invalidate their session. Share the new password manually.
 
-Inside an album, use each photograph's **Use as cover** button to choose the thumbnail shown on the client's gallery home. It saves immediately; **Current cover** identifies the selected photo, and Album details keeps a preview. Saving the title or description preserves the cover. If the selected photograph is deleted, the first remaining photo becomes the cover.
+Inside an album, open a photograph's **three-dot menu → Make cover image** to choose the thumbnail shown on the client's gallery home. It saves immediately; a **Cover** badge identifies the selected photo, and Album details keeps a preview. Saving the title or description preserves the cover. If the selected photograph is deleted, the first remaining photo becomes the cover.
 
-Photo order can be changed with drag handles on desktop, earlier/later arrows, or the numbered position field on desktop and mobile. Moves save immediately and the client's gallery uses the same order. Position numbers apply across the whole album, including other pages. New uploads append after the existing photographs; existing albums keep their prior client-visible order when the migration is applied. Album photos stay private; choosing a cover does not publish one on the public landing page.
+Drag a photo's handle to rearrange it on desktop. On mobile, hold the handle briefly, then drag; the rest of the photo remains available for normal scrolling. Keyboard users can focus the handle, press Space, use arrow keys, then Space to save or Escape to cancel. Moves update immediately and save automatically; failed saves restore the previous order. The client's gallery uses the same saved order. For a move across album pages, use **three-dot menu → Move to position…**; numbers apply across the whole album. New uploads append after existing photos. Album photos stay private; choosing a cover does not publish one on the public landing page.
 
 Public packages can be added, edited or hidden in **Collections**, including their images. The original five collections and exact prices/inclusions are seeded from the supplied Google Sites reference. Public pages refresh every two minutes and immediately when saved through the studio.
 
@@ -103,7 +103,7 @@ The public collection planner includes the reference's three-step finder, select
 - `public-assets` holds optional public package images and has an 8 MB upload limit.
 - Original bytes are retained. The server checks decoded image formats, sizes and pixel limits before adding database metadata; images masquerading as supported formats are rejected.
 - Admin-only upload preparation generates a signed upload URL and a separate HMAC-protected completion ticket. Database upload jobs claim completion once, preventing concurrent/repeated completion from deleting an existing photo.
-- The gallery loads optimised previews through authenticated endpoints. Download endpoints check the caller and RLS, then generate 60-second signed URLs for originals. Private files use zero-second object cache TTL; private application routes send `no-store`.
+- Gallery pages generate 60-second preview links in one batch using the caller's RLS-protected Supabase client. Images load directly from private Storage without an app-server request per photo. An expired preview falls back to its authenticated endpoint to recheck current access. Download endpoints check the caller and RLS, then generate 60-second signed URLs for originals. Private files use zero-second object cache TTL; private application routes send `no-store`.
 - RLS checks client ownership, active access and completed password change for albums, photographs and Storage. Clients cannot edit ownership, roles or profile security flags.
 - Disabling access rejects new requests immediately. Previously issued signed URLs can remain usable until their expiry; already downloaded files cannot be recalled.
 - Deleting photos/albums removes storage objects first and metadata afterward. Deletion is confirmed in the UI.
@@ -137,6 +137,8 @@ The code is ready to import into Vercel. Production hosting requires the environ
 4. Run `npm run build`, then deploy with `vercel --prod` when ready. Test admin/client login and private downloads on the deployed domain.
 
 Upload bytes go directly to Supabase, avoiding Vercel request-body limits. The completion route downloads the original server-side to validate it and produce a preview and allows up to 60 seconds; for much larger files or sustained bulk work, move that processing into a queue/background worker. Keep the first version's 25 MB limit.
+
+`vercel.json` runs functions in Sydney (`syd1`), matching the supplied Supabase project's `ap-southeast-2` region. When moving to another database region, update this setting to the nearest Vercel region. Public pages retain their two-minute cache; private pages and live account checks remain uncached. Server Actions return revalidated page data without a redundant client refresh.
 
 ## Scope
 

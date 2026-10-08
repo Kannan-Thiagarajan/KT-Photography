@@ -18,10 +18,12 @@ export async function proxy(request: NextRequest) {
       },
     },
   );
-  await db.auth.getUser();
+  // Refresh/verify here; the data layer still checks the live user and active profile.
+  await db.auth.getClaims();
   response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }
 export const config = {
-  matcher: ['/admin/:path*', '/gallery/:path*', '/account', '/login', '/api/:path*'],
+  // API handlers perform their own live session checks and can refresh response cookies.
+  matcher: ['/admin/:path*', '/gallery/:path*', '/account', '/login'],
 };

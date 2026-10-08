@@ -2,11 +2,13 @@
 /* Private images use authorized route handlers. Public assets use local URLs. */
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Download } from 'lucide-react';
+import { ProtectedImage } from './protected-image';
 export type GalleryImage = {
   id: string;
   src: string;
   alt: string;
   download?: string;
+  fallback?: string;
 };
 export function Lightbox({
   images,
@@ -86,8 +88,13 @@ export function Lightbox({
         >
           <ChevronLeft size={28} />
         </button>
-        {}
-        <img src={image.src} alt={image.alt} key={image.id} />
+        <ProtectedImage
+          src={image.src}
+          fallback={image.fallback || image.src}
+          alt={image.alt}
+          key={image.id}
+          loading="eager"
+        />
         <button
           className="icon-button"
           aria-label="Next photograph"

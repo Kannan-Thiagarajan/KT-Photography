@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { Images, ArrowUpRight, Camera } from 'lucide-react';
+import { ProtectedImage } from './protected-image';
 export function AlbumCard({
   album,
   href,
   client,
+  coverUrl,
 }: {
   album: {
     id: string;
@@ -14,12 +16,17 @@ export function AlbumCard({
   };
   href: string;
   client?: string;
+  coverUrl?: string;
 }) {
   return (
     <Link href={href} className="album-card">
       <div className="album-cover">
         {album.cover_image_path ? (
-          <img src={`/api/albums/${album.id}/cover`} alt={`${album.title} cover`} loading="lazy" />
+          <ProtectedImage
+            src={coverUrl}
+            fallback={`/api/albums/${album.id}/cover`}
+            alt={`${album.title} cover`}
+          />
         ) : (
           <Camera />
         )}

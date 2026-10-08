@@ -1,13 +1,14 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth/session';
 import { ActionForm, Field, TextArea } from '@/components/ui/action-form';
 import { Uploader } from '@/components/admin/uploader';
 import { saveAlbum, deleteAlbum } from '@/features/albums/actions';
 import { DeleteButton } from '@/components/ui/delete-button';
-import { PhotoGrid } from '@/components/gallery/photo-grid';
+import { AdminPhotoGrid } from '@/components/gallery/admin-photo-grid';
+import { ProtectedImage } from '@/components/gallery/protected-image';
+import { signedPreviews } from '@/lib/supabase/previews';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination, pageNumber } from '@/components/ui/pagination';
 export default async function AlbumDetail({
@@ -38,6 +39,10 @@ export default async function AlbumDetail({
     .order('display_order', { ascending: true })
     .range((page - 1) * size, page * size - 1);
   if (photoError) throw new Error('Unable to load photographs.');
+  const previews = await signedPreviews(db, [
+    ...(photos || []).map((p) => p.thumbnail_path),
+    album.cover_image_path,
+  ]);
   return (
     <>
       <Link href="/admin/albums" className="back-link">
@@ -76,26 +81,24 @@ export default async function AlbumDetail({
           <div className="album-cover-settings">
             <h3>Album cover</h3>
             {album.cover_image_path && (
-              <Image
+              <ProtectedImage
                 key={album.cover_image_path}
-                src={`/api/albums/${id}/cover`}
+                src={previews[album.cover_image_path]}
+                fallback={`/api/albums/${id}/cover`}
                 alt="Current album cover"
-                width={420}
-                height={150}
-                unoptimized
               />
             )}
             <p>
-              Choose <strong>Use as cover</strong> on any photograph below. It saves immediately and
-              appears on your client&apos;s gallery home.
+              Open the <strong>three-dot menu</strong> on a photograph and choose{' '}
+              <strong>Make cover</strong>. It saves immediately and appears on your client&apos;s
+              gallery home.
             </p>
           </div>
         </section>
       </div>
       {photos?.length ? (
-        <PhotoGrid
-          photos={photos}
-          admin
+        <AdminPhotoGrid
+          photos={photos.map((p) => ({ ...p, preview_url: previews[p.thumbnail_path] }))}
           coverPath={album.cover_image_path}
           offset={(page - 1) * size}
           total={count || 0}

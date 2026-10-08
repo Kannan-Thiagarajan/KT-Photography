@@ -99,6 +99,15 @@ test('database and storage enforce gallery ownership, access revocation and admi
       assert.deepEqual((await b.db.from('albums').select('id').eq('id', albumId)).data, []);
       assert.deepEqual((await b.db.from('photos').select('id').eq('id', photo.id)).data, []);
       assert.ok((await b.db.storage.from('client-photos').createSignedUrl(path, 60)).error);
+      const ownerBatch = await a.db.storage
+        .from('client-photos')
+        .createSignedUrls([path, thumb], 60);
+      assert.ifError(ownerBatch.error);
+      assert.ok(ownerBatch.data.every((item) => item.signedUrl && !item.error));
+      const otherBatch = await b.db.storage
+        .from('client-photos')
+        .createSignedUrls([path, thumb], 60);
+      assert.ok(otherBatch.error || otherBatch.data.every((item) => item.error));
       assert.ok(
         (await b.db.storage.from('client-photos').download(path, { cacheNonce: randomUUID() }))
           .error,

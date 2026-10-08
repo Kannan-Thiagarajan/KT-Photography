@@ -1,6 +1,7 @@
 import { Aperture } from 'lucide-react';
 import { requireGallery } from '@/lib/auth/session';
 import { AlbumCard } from '@/components/gallery/album-card';
+import { signedPreviews } from '@/lib/supabase/previews';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination, pageNumber } from '@/components/ui/pagination';
 import { whatsappLink } from '@/config/brand';
@@ -20,6 +21,10 @@ export default async function Gallery({
   if (profile.role !== 'admin') query = query.eq('client_id', profile.id);
   const { data: albums, count, error } = await query;
   if (error) throw new Error('Unable to load your galleries.');
+  const previews = await signedPreviews(
+    db,
+    (albums || []).map((a) => a.cover_image_path),
+  );
   return (
     <>
       <section className="client-welcome">
@@ -43,7 +48,12 @@ export default async function Gallery({
       {albums?.length ? (
         <div className="album-grid">
           {albums.map((a) => (
-            <AlbumCard key={a.id} album={a} href={`/gallery/${a.id}`} />
+            <AlbumCard
+              key={a.id}
+              album={a}
+              href={`/gallery/${a.id}`}
+              coverUrl={previews[a.cover_image_path || '']}
+            />
           ))}
         </div>
       ) : (

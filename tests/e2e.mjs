@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import { randomUUID } from 'node:crypto';
@@ -192,13 +192,22 @@ try {
   await page.getByLabel('Allow client to access their galleries').check();
   await page.getByLabel('Reset password (optional)').fill(password);
   await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled({
+    timeout: 15000,
+  });
   await page.getByRole('status').filter({ hasText: 'Client updated' }).waitFor();
+  assert.equal(
+    (await db.from('profiles').select('must_change_password').eq('id', clientId).single()).data
+      .must_change_password,
+    true,
+  );
   await clientPage.goto(`${base}/gallery`);
   await clientPage.waitForURL(`${base}/login`);
   await signIn(clientPage, clientEmail, password);
   await clientPage.waitForURL(`${base}/account`);
   console.log('PASS: Access revocation and admin password reset affect existing sessions.');
   await page.goto(`${base}/admin/albums/${albumId}`);
+  await page.getByRole('button', { name: 'Photo options: portrait.png', exact: true }).click();
   await page
     .locator('article')
     .filter({ has: page.getByRole('button', { name: 'Preview portrait.png', exact: true }) })

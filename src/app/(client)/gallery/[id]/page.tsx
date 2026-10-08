@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ArrowLeft, Download } from 'lucide-react';
 import { requireGallery } from '@/lib/auth/session';
 import { PhotoGrid } from '@/components/gallery/photo-grid';
+import { signedPreviews } from '@/lib/supabase/previews';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination, pageNumber } from '@/components/ui/pagination';
 export default async function ClientAlbum({
@@ -29,6 +30,10 @@ export default async function ClientAlbum({
     .order('display_order', { ascending: true })
     .range((page - 1) * size, page * size - 1);
   if (photoError) throw new Error('Unable to load photographs.');
+  const previews = await signedPreviews(
+    db,
+    (photos || []).map((p) => p.thumbnail_path),
+  );
   return (
     <>
       <Link href="/gallery" className="back-link">
@@ -55,7 +60,9 @@ export default async function ClientAlbum({
         </span>
       </div>
       {photos?.length ? (
-        <PhotoGrid photos={photos} />
+        <PhotoGrid
+          photos={photos.map((p) => ({ ...p, preview_url: previews[p.thumbnail_path] }))}
+        />
       ) : (
         <section className="panel">
           <EmptyState

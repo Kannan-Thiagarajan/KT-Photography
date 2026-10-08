@@ -26,19 +26,18 @@ export function ActionForm({
     if (state.success) {
       if (resetOnSuccess) form.current?.reset();
       if (redirectBase && state.id) router.push(`${redirectBase}/${state.id}`);
-      else router.refresh();
     }
   }, [state, router, redirectBase, resetOnSuccess]);
   return (
     <form action={formAction} ref={form} className={`form-stack ${className}`}>
       {children}
-      {state.error && (
+      {state.error && !pending && (
         <p className="notice error" role="alert">
           <AlertCircle size={18} />
           {state.error}
         </p>
       )}
-      {state.success && (
+      {state.success && !pending && (
         <p className="notice success" role="status">
           <CheckCircle2 size={18} />
           {state.success}

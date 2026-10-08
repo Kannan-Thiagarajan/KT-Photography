@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth/session';
 import { AlbumCard } from '@/components/gallery/album-card';
+import { signedPreviews } from '@/lib/supabase/previews';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination, pageNumber } from '@/components/ui/pagination';
 export default async function Albums({
@@ -22,6 +23,10 @@ export default async function Albums({
     .order('created_at', { ascending: false })
     .range((page - 1) * size, page * size - 1);
   if (error) throw new Error('Unable to load albums.');
+  const previews = await signedPreviews(
+    db,
+    (albums || []).map((a) => a.cover_image_path),
+  );
   return (
     <>
       <div className="page-heading">
@@ -45,6 +50,7 @@ export default async function Albums({
               album={a}
               href={`/admin/albums/${a.id}`}
               client={a.profiles?.full_name}
+              coverUrl={previews[a.cover_image_path || '']}
             />
           ))}
         </div>
