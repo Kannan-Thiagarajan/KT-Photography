@@ -1,0 +1,4 @@
+project_id = "kt-photography"
+
+[functions.kt-storage-maintenance]
+verify_jwt = true

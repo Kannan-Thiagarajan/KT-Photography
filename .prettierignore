@@ -1,0 +1,7 @@
+.next
+node_modules
+.local
+.mcp.json
+package-lock.json
+src/types/database.ts
+src/app/fonts.css
