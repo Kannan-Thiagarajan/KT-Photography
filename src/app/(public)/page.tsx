@@ -19,10 +19,14 @@ import { Collections } from '@/components/public/collections';
 import { Showcase } from '@/components/public/showcase';
 import { AudioControl } from '@/components/public/audio-control';
 import { PromoNotice } from '@/components/public/promo-notice';
+import { HashScroller } from '@/components/public/hash-scroller';
+import { AlbumCard } from '@/components/gallery/album-card';
+import { signedPreviews } from '@/lib/supabase/previews';
 import { collectionFaqs } from '@/features/quotation/model';
 import { brand, whatsappLink } from '@/config/brand';
+import { adminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
-export const revalidate = 120;
+export const revalidate = 0;
 export default async function Home() {
   const db = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,20 +42,45 @@ export default async function Home() {
 
   let homepagePhotos: any[] = [];
   try {
-    const { data: hpData } = await db
+    const photoClient = process.env.SUPABASE_SECRET_KEY ? adminClient() : db;
+    const { data: hpData, error: hpError } = await photoClient
       .from('homepage_photos')
       .select('*')
       .eq('is_active', true)
       .order('display_order');
-    if (hpData && hpData.length > 0) {
+    if (!hpError && hpData && hpData.length > 0) {
       homepagePhotos = hpData;
     }
-  } catch {
+  } catch (err) {
+    console.error('Failed to query homepage photos:', err);
     homepagePhotos = [];
   }
+
+  let publicAlbums: any[] = [];
+  try {
+    const albumClient = process.env.SUPABASE_SECRET_KEY ? adminClient() : db;
+    const { data: aData } = await albumClient
+      .from('albums')
+      .select('id, title, description, cover_image_path, created_at, is_public, photos(count)')
+      .order('created_at', { ascending: false })
+      .limit(6);
+    if (aData) {
+      const explicitPublic = aData.filter((a) => a.is_public === true);
+      publicAlbums = explicitPublic.length > 0 ? explicitPublic : aData;
+    }
+  } catch (err) {
+    console.error('Failed to query public albums for homepage:', err);
+    publicAlbums = [];
+  }
+
+  const albumPreviews = await signedPreviews(
+    process.env.SUPABASE_SECRET_KEY ? adminClient() : db,
+    publicAlbums.map((a) => a.cover_image_path),
+  );
   return (
     <>
       <PromoNotice />
+      <HashScroller />
       <PublicNav />
       <main id="main">
         <section className="hero">
@@ -194,6 +223,41 @@ export default async function Home() {
             </Link>
           </div>
         </section>
+        {publicAlbums.length > 0 && (
+          <section id="albums" className="section container" style={{ paddingTop: '1.5rem' }}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">03 / REAL CELEBRATIONS & ALBUMS</p>
+                <h2>
+                  Full stories.
+                  <br />
+                  Every <em>heartfelt moment.</em>
+                </h2>
+              </div>
+              <p>
+                Browse complete photo collections from recent ceremonies,
+                <br />
+                bridal sessions, and celebrations.
+              </p>
+            </div>
+            <div className="album-grid">
+              {publicAlbums.map((album) => (
+                <AlbumCard
+                  key={album.id}
+                  album={album}
+                  href={`/samples/${album.id}`}
+                  badge="✦ Featured Album"
+                  coverUrl={album.cover_image_path ? albumPreviews[album.cover_image_path] : undefined}
+                />
+              ))}
+            </div>
+            <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+              <Link href="/samples" className="button button-gold">
+                View all sample albums <ArrowUpRight size={16} />
+              </Link>
+            </div>
+          </section>
+        )}
         <section className="section container experience-section">
           <div className="experience-intro">
             <p className="eyebrow">THE KT EXPERIENCE</p>
@@ -248,7 +312,7 @@ export default async function Home() {
               <span className="about-signature">Kannan.</span>
             </div>
             <div className="about-copy">
-              <p className="eyebrow">03 / THE PERSON BEHIND THE CAMERA</p>
+              <p className="eyebrow">04 / THE PERSON BEHIND THE CAMERA</p>
               <h2>
                 Meet Kannan.
                 <br />

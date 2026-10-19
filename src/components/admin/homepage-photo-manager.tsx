@@ -1,5 +1,6 @@
 'use client';
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   ArrowUp,
@@ -7,8 +8,6 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Plus,
-  ChevronDown,
   Sparkles,
 } from 'lucide-react';
 import { ActionForm, Field } from '@/components/ui/action-form';
@@ -28,9 +27,18 @@ export function HomepagePhotoManager({
   photos: HomepagePhoto[];
   supabaseUrl: string;
 }) {
+  const router = useRouter();
   const [photos, setPhotos] = useState<HomepagePhoto[]>(initialPhotos);
+  const [prevInitialPhotos, setPrevInitialPhotos] = useState<HomepagePhoto[]>(initialPhotos);
   const [newImage, setNewImage] = useState('');
   const [isPending, startTransition] = useTransition();
+
+  const cleanSupabaseUrl = (supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
+
+  if (initialPhotos !== prevInitialPhotos) {
+    setPrevInitialPhotos(initialPhotos);
+    setPhotos(initialPhotos);
+  }
 
   const handleToggle = (id: string, current: boolean) => {
     startTransition(async () => {
@@ -38,6 +46,7 @@ export function HomepagePhotoManager({
         prev.map((p) => (p.id === id ? { ...p, is_active: !current } : p)),
       );
       await toggleHomepagePhoto(id, !current);
+      router.refresh();
     });
   };
 
@@ -52,6 +61,7 @@ export function HomepagePhotoManager({
     setPhotos(updated);
     startTransition(async () => {
       await reorderHomepagePhotos(updated.map((p) => p.id));
+      router.refresh();
     });
   };
 
@@ -60,6 +70,7 @@ export function HomepagePhotoManager({
     startTransition(async () => {
       setPhotos((prev) => prev.filter((p) => p.id !== id));
       await deleteHomepagePhoto(id);
+      router.refresh();
     });
   };
 
@@ -89,9 +100,10 @@ export function HomepagePhotoManager({
         ) : (
           <div className="homepage-photos-list">
             {photos.map((photo, index) => {
+              const cleanPath = photo.storage_path.replace(/^\/+/, '');
               const imageUrl = photo.storage_path.startsWith('http')
                 ? photo.storage_path
-                : `${supabaseUrl}/storage/v1/object/public/public-assets/${photo.storage_path}`;
+                : `${cleanSupabaseUrl}/storage/v1/object/public/public-assets/${cleanPath}`;
 
               return (
                 <article
@@ -189,9 +201,30 @@ export function HomepagePhotoManager({
 
         <ActionForm
           action={async (prev, formData) => {
+            const uploadedPath = newImage;
             const res = await saveHomepagePhoto(prev, formData);
             if (res.success) {
               setNewImage('');
+              const title = String(formData.get('title') || '');
+              const alt = String(formData.get('alt') || title);
+              const label = String(formData.get('label') || '');
+              const category = String(formData.get('category') || 'Bridal portraits');
+              const is_active = formData.has('is_active') ? formData.get('is_active') === 'on' : true;
+              const nowIso = new Date().toISOString();
+              const newPhoto: HomepagePhoto = {
+                id: res.id || `temp-${Date.now()}`,
+                storage_path: uploadedPath,
+                title,
+                alt,
+                label,
+                category,
+                display_order: photos.length,
+                is_active,
+                created_at: nowIso,
+                updated_at: nowIso,
+              };
+              setPhotos((prev) => [...prev, newPhoto]);
+              router.refresh();
             }
             return res;
           }}
@@ -205,7 +238,7 @@ export function HomepagePhotoManager({
               <div className="uploaded-preview-container">
                 <div className="package-image-preview">
                   <Image
-                    src={`${supabaseUrl}/storage/v1/object/public/public-assets/${newImage}`}
+                    src={`${cleanSupabaseUrl}/storage/v1/object/public/public-assets/${newImage.replace(/^\/+/, '')}`}
                     alt="Uploaded preview"
                     fill
                     sizes="400px"

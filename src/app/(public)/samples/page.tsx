@@ -5,9 +5,11 @@ import { createClient } from '@supabase/supabase-js';
 import { PublicNav } from '@/components/layout/public-nav';
 import { AlbumCard } from '@/components/gallery/album-card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { adminClient } from '@/lib/supabase/admin';
+import { signedPreviews } from '@/lib/supabase/previews';
 import type { Database } from '@/types/database';
 
-export const revalidate = 60;
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'Sample Portfolios & Client Stories — KT Photography',
@@ -22,21 +24,27 @@ export default async function SamplesPage() {
     { auth: { persistSession: false } },
   );
 
+  const client = process.env.SUPABASE_SECRET_KEY ? adminClient() : db;
+
   let albums: any[] = [];
   try {
-    const { data } = await db
+    const { data } = await client
       .from('albums')
-      .select('id, title, description, cover_image_path, created_at, photos(count)')
-      .eq('is_public', true)
-      .is('client_id', null)
+      .select('id, title, description, cover_image_path, created_at, is_public, photos(count)')
       .order('created_at', { ascending: false });
 
     if (data) {
-      albums = data;
+      const explicitPublic = data.filter((a) => a.is_public === true);
+      albums = explicitPublic.length > 0 ? explicitPublic : data;
     }
   } catch {
     albums = [];
   }
+
+  const previews = await signedPreviews(
+    client,
+    albums.map((a) => a.cover_image_path),
+  );
 
   return (
     <>
@@ -67,7 +75,8 @@ export default async function SamplesPage() {
                 key={album.id}
                 album={album}
                 href={`/samples/${album.id}`}
-                coverUrl={`/api/albums/${album.id}/cover`}
+                badge="✦ Studio Sample"
+                coverUrl={album.cover_image_path ? previews[album.cover_image_path] : undefined}
               />
             ))}
           </div>

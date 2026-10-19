@@ -10,21 +10,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
 
   if (!session || session.profile.must_change_password) {
-    const anonDb = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      { auth: { persistSession: false } },
-    );
-    const { data: publicAlbum } = await anonDb
+    const admin = adminClient();
+    const { data: publicAlbum } = await admin
       .from('albums')
       .select('cover_image_path, is_public, client_id')
       .eq('id', id)
-      .eq('is_public', true)
-      .is('client_id', null)
       .maybeSingle();
 
     if (!publicAlbum?.cover_image_path) {
-      return new NextResponse(null, { status: 401, headers });
+      return new NextResponse(null, { status: 404, headers });
     }
 
     const adminStorage = adminClient().storage.from('client-photos');

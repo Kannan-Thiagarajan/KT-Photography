@@ -1,9 +1,61 @@
 'use client';
 import Image from 'next/image';
-import { useState, useCallback, useMemo } from 'react';
-import { ArrowUpRight } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect, useRef, useSyncExternalStore } from 'react';
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  Sparkles,
+} from 'lucide-react';
 import { Lightbox } from '@/components/gallery/lightbox';
 import type { HomepagePhoto } from '@/types/models';
+
+function subscribeReducedMotion(callback: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  mediaQuery.addEventListener('change', callback);
+  return () => mediaQuery.removeEventListener('change', callback);
+}
+
+function getReducedMotionSnapshot() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function getServerReducedMotionSnapshot() {
+  return false;
+}
+
+function ShowcaseImage({
+  src,
+  alt,
+  priority,
+}: {
+  src: string;
+  alt: string;
+  priority: boolean;
+}) {
+  const [imgSrc, setImgSrc] = useState(src);
+
+  return (
+    <Image
+      src={imgSrc}
+      alt={alt}
+      fill
+      priority={priority}
+      loading={priority ? 'eager' : 'lazy'}
+      sizes="(max-width: 600px) 90vw, (max-width: 1024px) 50vw, 420px"
+      className="showcase-img"
+      onError={() => {
+        if (imgSrc !== '/assets/images/wed.webp') {
+          setImgSrc('/assets/images/wed.webp');
+        }
+      }}
+    />
+  );
+}
 
 const defaultPhotos = [
   {
@@ -23,11 +75,27 @@ const defaultPhotos = [
     category: 'Bridal portraits',
   },
   {
-    id: 'ceremony',
-    src: '/assets/images/ceremony.webp',
-    alt: 'Wedding ceremonial detail from the supplied KT asset collection',
-    label: 'CELEBRATING CONNECTION',
-    title: 'Stories in the little things.',
+    id: 'outdoor',
+    src: '/assets/images/outdoor.webp',
+    alt: 'Couple in outdoor setting during golden hour',
+    label: 'NATURAL LIGHT & CANDIDS',
+    title: 'Golden hours, pure emotion.',
+    category: 'Bridal portraits',
+  },
+  {
+    id: 'outdoor1',
+    src: '/assets/images/outdoor1.webp',
+    alt: 'Outdoor celebration moment',
+    label: 'UNSCRIPTED JOY',
+    title: 'Laughter that fills the room.',
+    category: 'Celebrations',
+  },
+  {
+    id: 'outdoor3',
+    src: '/assets/images/outdoor3.webp',
+    alt: 'Atmospheric ceremonial photography',
+    label: 'ATMOSPHERE & ELEGANCE',
+    title: 'Capturing what it felt like.',
     category: 'Celebrations',
   },
 ];
@@ -39,21 +107,42 @@ export function Showcase({
   managedPhotos?: HomepagePhoto[];
   supabaseUrl?: string;
 }) {
+  const cleanSupabaseUrl = useMemo(
+    () => (supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, ''),
+    [supabaseUrl],
+  );
+
   const photos = useMemo(() => {
-    if (managedPhotos && managedPhotos.length > 0) {
-      return managedPhotos.map((p) => ({
+    const formattedManaged = (managedPhotos || []).map((p) => {
+      let src = p.storage_path;
+      if (!src.startsWith('http') && !src.startsWith('/')) {
+        const cleanPath = p.storage_path.replace(/^\/+/, '');
+        const bucketPrefix = cleanPath.startsWith('public-assets/') ? '' : 'public-assets/';
+        src = `${cleanSupabaseUrl}/storage/v1/object/public/${bucketPrefix}${cleanPath}`;
+      }
+      return {
         id: p.id,
-        src: p.storage_path.startsWith('http') || p.storage_path.startsWith('/')
-          ? p.storage_path
-          : `${supabaseUrl || ''}/storage/v1/object/public/public-assets/${p.storage_path}`,
+        src,
         alt: p.alt || p.title || 'KT Photography showcase portrait',
         label: p.label || 'PORTFOLIO SPOTLIGHT',
         title: p.title || 'A moment, timeless.',
         category: p.category || 'Bridal portraits',
-      }));
+      };
+    });
+
+    if (formattedManaged.length >= 3) {
+      return formattedManaged;
     }
+
+    if (formattedManaged.length > 0) {
+      const defaultFiltered = defaultPhotos.filter(
+        (def) => !formattedManaged.some((m) => m.id === def.id)
+      );
+      return [...formattedManaged, ...defaultFiltered];
+    }
+
     return defaultPhotos;
-  }, [managedPhotos, supabaseUrl]);
+  }, [managedPhotos, cleanSupabaseUrl]);
 
   const categories = useMemo(() => {
     const set = new Set(photos.map((p) => p.category));
@@ -61,51 +150,255 @@ export function Showcase({
   }, [photos]);
 
   const [filter, setFilter] = useState('All');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
-  const close = useCallback(() => setSelected(null), []);
 
-  const filtered = photos.filter((p) => filter === 'All' || p.category === filter);
+  const isReducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotionSnapshot,
+    getServerReducedMotionSnapshot,
+  );
+
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(
+    () => photos.filter((p) => filter === 'All' || p.category === filter),
+    [photos, filter],
+  );
+
+  const scrollToSlide = useCallback(
+    (index: number) => {
+      if (!trackRef.current) return;
+      const slides = trackRef.current.children;
+      if (slides[index]) {
+        const slide = slides[index] as HTMLElement;
+        slide.scrollIntoView({
+          behavior: isReducedMotion ? 'auto' : 'smooth',
+          block: 'nearest',
+          inline: 'center',
+        });
+        setCurrentIndex(index);
+      }
+    },
+    [isReducedMotion],
+  );
+
+  const handlePrev = useCallback(() => {
+    if (filtered.length <= 1) return;
+    const prevIdx = (currentIndex - 1 + filtered.length) % filtered.length;
+    scrollToSlide(prevIdx);
+  }, [currentIndex, filtered.length, scrollToSlide]);
+
+  const handleNext = useCallback(() => {
+    if (filtered.length <= 1) return;
+    const nextIdx = (currentIndex + 1) % filtered.length;
+    scrollToSlide(nextIdx);
+  }, [currentIndex, filtered.length, scrollToSlide]);
+
+  const handleDotClick = useCallback(
+    (index: number) => {
+      scrollToSlide(index);
+    },
+    [scrollToSlide],
+  );
+
+  const handleFilterSelect = (cat: string) => {
+    setFilter(cat);
+    setCurrentIndex(0);
+    if (trackRef.current) {
+      trackRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleScroll = useCallback(() => {
+    if (!trackRef.current) return;
+    const track = trackRef.current;
+    const slides = Array.from(track.children) as HTMLElement[];
+    if (slides.length === 0) return;
+
+    const trackCenter = track.scrollLeft + track.clientWidth / 2;
+    let closestIndex = 0;
+    let minDistance = Infinity;
+
+    slides.forEach((slide, idx) => {
+      const slideCenter = slide.offsetLeft + slide.offsetWidth / 2;
+      const dist = Math.abs(trackCenter - slideCenter);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = idx;
+      }
+    });
+
+    if (closestIndex !== currentIndex) {
+      setCurrentIndex(closestIndex);
+    }
+  }, [currentIndex]);
+
+  // Handle automatic carousel movement
+  useEffect(() => {
+    if (!isPlaying || isHovered || isFocused || isReducedMotion || filtered.length <= 1) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      handleNext();
+    }, 4500);
+
+    return () => clearInterval(timer);
+  }, [isPlaying, isHovered, isFocused, isReducedMotion, filtered.length, handleNext]);
+
+  // Keyboard controls
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      handlePrev();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      handleNext();
+    }
+  };
+
+  const closeLightbox = useCallback(() => setSelected(null), []);
 
   return (
-    <>
-      <div className="filter-tabs portfolio-filters">
-        {categories.map((f) => (
+    <section
+      className="showcase-section"
+      aria-roledescription="carousel"
+      aria-label="Through the Lens photography portfolio"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Category filter tabs */}
+      <div className="filter-tabs portfolio-filters" role="tablist" aria-label="Filter portfolio categories">
+        {categories.map((cat) => (
           <button
-            key={f}
-            aria-pressed={filter === f}
-            className={filter === f ? 'active' : ''}
-            onClick={() => setFilter(f)}
+            key={cat}
+            role="tab"
+            aria-selected={filter === cat}
+            className={filter === cat ? 'active' : ''}
+            onClick={() => handleFilterSelect(cat)}
           >
-            {f}
+            {cat}
           </button>
         ))}
       </div>
-      <div className="showcase-grid">
-        {filtered.map((p, i) => (
-          <button
-            key={p.id}
-            className={`showcase-photo photo-${i % 3}`}
-            onClick={() => setSelected(photos.indexOf(p))}
-          >
-            <Image
-              src={p.src}
-              alt={p.alt}
-              fill
-              sizes="(max-width: 700px) 90vw, 40vw"
+
+      {/* Cinematic Showcase Stage */}
+      <div className="showcase-carousel-wrap">
+        <div
+          ref={trackRef}
+          className="showcase-carousel-track"
+          onScroll={handleScroll}
+        >
+          {filtered.map((photo, i) => {
+            const isCurrent = i === currentIndex;
+            const steppedClass = `step-${i % 3}`;
+
+            return (
+              <article
+                key={photo.id}
+                className={`showcase-slide ${isCurrent ? 'active' : ''} ${steppedClass}`}
+                aria-hidden={!isCurrent}
+                aria-label={`${photo.title} (${photo.category})`}
+              >
+                <button
+                  type="button"
+                  className="showcase-photo-button"
+                  onClick={() => setSelected(photos.indexOf(photo))}
+                  aria-label={`View ${photo.title} in full-screen gallery`}
+                >
+                  <div className="showcase-image-container">
+                    <ShowcaseImage
+                      src={photo.src}
+                      alt={photo.alt}
+                      priority={i === 0 || i === 1}
+                    />
+                  </div>
+                  <div className="showcase-caption">
+                    <div>
+                      <span>{photo.label}</span>
+                      <h3>{photo.title}</h3>
+                    </div>
+                    <span className="round-arrow" aria-hidden="true">
+                      <ArrowUpRight size={20} />
+                    </span>
+                  </div>
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Interactive Controls & Pagination Bar */}
+      <div className="showcase-controls-bar">
+        <div className="showcase-counter">
+          <Sparkles size={14} className="gold" aria-hidden="true" />
+          <span>
+            {String(currentIndex + 1).padStart(2, '0')} / {String(filtered.length).padStart(2, '0')}
+          </span>
+          <span className="showcase-active-cat">{filtered[currentIndex]?.category}</span>
+        </div>
+
+        {/* Clickable Pagination Dots */}
+        <div className="showcase-dots" role="tablist" aria-label="Slides">
+          {filtered.map((p, idx) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={idx === currentIndex}
+              className={`showcase-dot ${idx === currentIndex ? 'active' : ''}`}
+              onClick={() => handleDotClick(idx)}
+              aria-label={`Go to slide ${idx + 1}: ${p.title}`}
             />
-            <div className="showcase-caption">
-              <div>
-                <span>{p.label}</span>
-                <h3>{p.title}</h3>
-              </div>
-              <span className="round-arrow">
-                <ArrowUpRight size={22} />
-              </span>
-            </div>
+          ))}
+        </div>
+
+        {/* Playback & Direction Controls */}
+        <div className="showcase-nav-group">
+          <button
+            type="button"
+            className="showcase-nav-btn"
+            onClick={handlePrev}
+            aria-label="Previous photograph"
+            title="Previous (Left arrow)"
+          >
+            <ChevronLeft size={18} />
           </button>
-        ))}
+
+          <button
+            type="button"
+            className="showcase-nav-btn"
+            onClick={() => setIsPlaying((p) => !p)}
+            aria-label={isPlaying ? 'Pause automated showcase' : 'Play automated showcase'}
+            title={isPlaying ? 'Pause auto-sliding' : 'Resume auto-sliding'}
+          >
+            {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+          </button>
+
+          <button
+            type="button"
+            className="showcase-nav-btn"
+            onClick={handleNext}
+            aria-label="Next photograph"
+            title="Next (Right arrow)"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
       </div>
-      {selected !== null && <Lightbox images={photos} index={selected} onClose={close} />}
-    </>
+
+      {selected !== null && (
+        <Lightbox images={photos} index={selected} onClose={closeLightbox} />
+      )}
+    </section>
   );
 }

@@ -38,16 +38,21 @@ export async function saveHomepagePhoto(_: ActionResult, data: FormData): Promis
       is_active,
     };
 
-    check(
-      (id
-        ? await db.from('homepage_photos').update(values).eq('id', id)
-        : await db.from('homepage_photos').insert(values)
-      ).error,
-    );
+    const result = id
+      ? await db.from('homepage_photos').update(values).eq('id', id).select('id').single()
+      : await db.from('homepage_photos').insert(values).select('id').single();
 
-    revalidatePath('/');
+    check(result.error);
+
+    revalidatePath('/', 'page');
+    revalidatePath('/', 'layout');
+    revalidatePath('/admin/homepage', 'page');
     revalidatePath('/admin/homepage');
-    return { success: id ? 'Photo details saved.' : 'Photo added to homepage showcase.' };
+
+    return {
+      success: id ? 'Photo details saved.' : 'Photo added to homepage showcase.',
+      id: result.data?.id || id,
+    };
   } catch (error) {
     return { error: message(error) };
   }
@@ -77,7 +82,9 @@ export async function deleteHomepagePhoto(id: string): Promise<ActionResult> {
       }
     }
 
-    revalidatePath('/');
+    revalidatePath('/', 'page');
+    revalidatePath('/', 'layout');
+    revalidatePath('/admin/homepage', 'page');
     revalidatePath('/admin/homepage');
     return { success: 'Photo removed from homepage.' };
   } catch (error) {
@@ -91,7 +98,9 @@ export async function toggleHomepagePhoto(id: string, is_active: boolean): Promi
     uuid(id);
     check((await db.from('homepage_photos').update({ is_active }).eq('id', id)).error);
 
-    revalidatePath('/');
+    revalidatePath('/', 'page');
+    revalidatePath('/', 'layout');
+    revalidatePath('/admin/homepage', 'page');
     revalidatePath('/admin/homepage');
     return { success: is_active ? 'Photo published to homepage.' : 'Photo hidden from homepage.' };
   } catch (error) {
@@ -107,7 +116,9 @@ export async function reorderHomepagePhotos(ids: string[]): Promise<ActionResult
       check((await db.from('homepage_photos').update({ display_order: i }).eq('id', id)).error);
     }
 
-    revalidatePath('/');
+    revalidatePath('/', 'page');
+    revalidatePath('/', 'layout');
+    revalidatePath('/admin/homepage', 'page');
     revalidatePath('/admin/homepage');
     return { success: 'Homepage photo order updated.' };
   } catch (error) {

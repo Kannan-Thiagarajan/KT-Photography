@@ -22,10 +22,17 @@ create index if not exists homepage_photos_order_idx on public.homepage_photos(d
 
 alter table public.homepage_photos enable row level security;
 
--- Public can view active homepage photos; admins can view all
+-- Public can view active homepage photos; admins can view all (including inactive drafts)
+-- Separate anon and authenticated policies so anon visitors never evaluate private.is_admin()
 drop policy if exists homepage_photos_read on public.homepage_photos;
-create policy homepage_photos_read on public.homepage_photos
-  for select to anon, authenticated
+drop policy if exists homepage_photos_read_anon on public.homepage_photos;
+create policy homepage_photos_read_anon on public.homepage_photos
+  for select to anon
+  using (is_active = true);
+
+drop policy if exists homepage_photos_read_auth on public.homepage_photos;
+create policy homepage_photos_read_auth on public.homepage_photos
+  for select to authenticated
   using (is_active = true or private.is_admin());
 
 -- Only admins can insert, update, or delete homepage photos

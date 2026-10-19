@@ -1,5 +1,16 @@
 import type { NextConfig } from 'next';
 import { resolve } from 'node:path';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+let supabaseHostname: string | undefined;
+let supabaseProtocol: 'http' | 'https' = 'https';
+if (supabaseUrl) {
+  try {
+    const parsed = new URL(supabaseUrl);
+    supabaseHostname = parsed.hostname;
+    supabaseProtocol = parsed.protocol.replace(':', '') as 'http' | 'https';
+  } catch {}
+}
+
 const config: NextConfig = {
   turbopack: { root: resolve('.') },
   experimental: { serverActions: { bodySizeLimit: '2mb' } },
@@ -7,9 +18,18 @@ const config: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'djrksjduptjyyeegkuea.supabase.co',
+        hostname: '*.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
+      ...(supabaseHostname
+        ? [
+            {
+              protocol: supabaseProtocol,
+              hostname: supabaseHostname,
+              pathname: '/storage/v1/object/public/**',
+            },
+          ]
+        : []),
     ],
   },
   async headers() {

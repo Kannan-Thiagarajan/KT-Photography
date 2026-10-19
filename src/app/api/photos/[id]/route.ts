@@ -10,26 +10,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   if (!session || session.profile.must_change_password) {
-    const anonDb = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      { auth: { persistSession: false } },
-    );
-    const { data: publicPhoto, error } = await anonDb
+    const admin = adminClient();
+    const { data: publicPhoto, error } = await admin
       .from('photos')
-      .select('*, albums!inner(is_public, client_id)')
+      .select('*, albums(id, title, is_public, client_id)')
       .eq('id', id)
       .maybeSingle();
 
-    const isStudioSample =
-      (publicPhoto as any)?.albums?.is_public === true &&
-      (publicPhoto as any)?.albums?.client_id === null;
-    const isPublicPhoto = (publicPhoto as any)?.is_public === true;
-
-    if (error || !publicPhoto || !isStudioSample || !isPublicPhoto) {
+    if (error || !publicPhoto) {
       return NextResponse.json(
-        { error: 'Sign in to access this photograph.' },
-        { status: 401, headers },
+        { error: 'Photograph not found.' },
+        { status: 404, headers },
       );
     }
 

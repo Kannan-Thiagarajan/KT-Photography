@@ -34,13 +34,11 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
 
       const { data: currentAlbum } = await db.from('albums').select('client_id').eq('id', id).single();
 
-      if ((pixieset_url || google_drive_url) && currentAlbum?.client_id === null) {
-        throw new Error('Studio sample albums cannot have client Pixieset or Google Drive delivery links.');
-      }
-
+      let effectiveClientId = currentAlbum?.client_id ?? null;
       const updatePayload: {
         title: string;
         description: string;
+        client_id?: string | null;
         cover_image_path?: string | null;
         is_public?: boolean;
         pixieset_url?: string | null;
@@ -52,15 +50,34 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
         ...(data.has('pixieset_url') ? { pixieset_url } : {}),
         ...(data.has('google_drive_url') ? { google_drive_url } : {}),
       };
-      if (data.has('is_public')) {
-        const wantsPublic = data.get('is_public') === 'on';
-        if (wantsPublic) {
-          if (currentAlbum?.client_id !== null) {
-            throw new Error('Only studio sample albums (without an assigned client) can be published publicly.');
-          }
+
+      if (data.has('client_id')) {
+        const rawClientId = String(data.get('client_id') || '').trim();
+        if (rawClientId === 'studio' || !rawClientId) {
+          effectiveClientId = null;
+          updatePayload.client_id = null;
+        } else {
+          uuid(rawClientId);
+          const { data: client } = await db
+            .from('profiles')
+            .select('id')
+            .eq('id', rawClientId)
+            .eq('role', 'client')
+            .single();
+          if (!client) throw new Error('Choose a valid client or create a studio sample.');
+          effectiveClientId = client.id;
+          updatePayload.client_id = client.id;
         }
-        updatePayload.is_public = wantsPublic;
       }
+
+      if ((pixieset_url || google_drive_url) && effectiveClientId === null) {
+        throw new Error('Studio sample albums cannot have client Pixieset or Google Drive delivery links.');
+      }
+
+      if (data.has('is_public')) {
+        updatePayload.is_public = data.get('is_public') === 'on';
+      }
+
       check(
         (
           await db
@@ -69,6 +86,9 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
             .eq('id', id)
         ).error,
       );
+      revalidatePath('/samples');
+      revalidatePath(`/samples/${id}`);
+      revalidatePath('/');
     } else {
       const rawClientId = String(data.get('client_id') || '').trim();
       let client_id: string | null = null;
@@ -88,10 +108,7 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
         throw new Error('Studio sample albums cannot have client Pixieset or Google Drive delivery links.');
       }
 
-      const is_public = data.get('is_public') === 'on';
-      if (is_public && client_id !== null) {
-        throw new Error('Only studio sample albums (without an assigned client) can be published publicly.');
-      }
+      const is_public = data.has('is_public') ? data.get('is_public') === 'on' : true;
       const { data: album, error } = await db
         .from('albums')
         .insert({
@@ -107,6 +124,7 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
       check(error);
       revalidatePath('/admin/albums');
       revalidatePath('/samples');
+      revalidatePath('/');
       return {
         success: 'Album created. You can now add photographs.',
         id: album!.id,
@@ -118,6 +136,7 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
     revalidatePath(`/gallery/${id}`);
     revalidatePath('/samples');
     revalidatePath(`/samples/${id}`);
+    revalidatePath('/');
     return { success: 'Album saved.' };
   } catch (error) {
     return { error: message(error) };
@@ -128,18 +147,13 @@ export async function togglePublishAlbum(id: string, is_public: boolean): Promis
   const { db } = await requireAdmin();
   try {
     uuid(id);
-    if (is_public) {
-      const { data: album } = await db.from('albums').select('client_id').eq('id', id).single();
-      if (album?.client_id !== null) {
-        throw new Error('Only studio sample albums (without an assigned client) can be published publicly.');
-      }
-    }
     check((await db.from('albums').update({ is_public }).eq('id', id)).error);
     revalidatePath('/admin/albums');
     revalidatePath(`/admin/albums/${id}`);
     revalidatePath('/samples');
     revalidatePath(`/samples/${id}`);
-    return { success: is_public ? 'Album published as public sample.' : 'Album is now private.' };
+    revalidatePath('/');
+    return { success: is_public ? 'Album published to public website.' : 'Album is now private.' };
   } catch (error) {
     return { error: message(error) };
   }
