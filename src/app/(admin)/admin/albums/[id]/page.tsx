@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Eye } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth/session';
 import { ActionForm, Field, TextArea } from '@/components/ui/action-form';
 import { Uploader } from '@/components/admin/uploader';
@@ -11,6 +11,7 @@ import { ProtectedImage } from '@/components/gallery/protected-image';
 import { signedPreviews } from '@/lib/supabase/previews';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination, pageNumber } from '@/components/ui/pagination';
+
 export default async function AlbumDetail({
   params,
   searchParams,
@@ -43,18 +44,79 @@ export default async function AlbumDetail({
     ...(photos || []).map((p) => p.thumbnail_path),
     album.cover_image_path,
   ]);
+
+  const { data: clients } = await db
+    .from('profiles')
+    .select('id,full_name,email')
+    .eq('role', 'client')
+    .order('full_name');
+
+  const isStudioSample = album.client_id === null;
+
   return (
     <>
-      <Link href="/admin/albums" className="back-link">
-        <ArrowLeft size={14} />
-        All albums
-      </Link>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <Link href="/admin/albums" className="back-link" style={{ marginBottom: 0 }}>
+          <ArrowLeft size={14} />
+          All albums
+        </Link>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Link
+            href={`/samples/${id}`}
+            target="_blank"
+            className="text-link gold"
+            style={{ fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <Eye size={14} />
+            View on public website
+            <ExternalLink size={12} />
+          </Link>
+          {!isStudioSample && (
+            <Link
+              href={`/gallery/${id}`}
+              target="_blank"
+              className="text-link"
+              style={{ fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <Eye size={14} />
+              View client gallery
+              <ExternalLink size={12} />
+            </Link>
+          )}
+        </div>
+      </div>
+
       <div className="page-heading">
         <div>
-          <p className="eyebrow">{album.profiles?.full_name} / PRIVATE COLLECTION</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                letterSpacing: '0.06em',
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: '3px',
+                background: album.is_public ? '#d9b87b22' : '#ffffff12',
+                color: album.is_public ? 'var(--gold)' : 'var(--muted)',
+                border: `1px solid ${album.is_public ? '#d9b87b44' : 'var(--line)'}`,
+              }}
+            >
+              {album.is_public ? '✦ PUBLIC ON WEBSITE' : 'PRIVATE ALBUM'}
+            </span>
+            {album.profiles?.full_name && (
+              <span style={{ fontSize: '0.8125rem', color: 'var(--muted)' }}>
+                Assigned to: <strong style={{ color: 'var(--text)' }}>{album.profiles.full_name}</strong> ({album.profiles.email})
+              </span>
+            )}
+          </div>
           <h1>{album.title}</h1>
           <p>
-            {count || 0} photographs · {album.profiles?.email}
+            {count || 0} photographs · Created on{' '}
+            {new Date(album.created_at).toLocaleDateString('en-MY', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
           </p>
         </div>
         <DeleteButton action={deleteAlbum} id={id} label="album" redirectTo="/admin/albums" />
@@ -77,6 +139,40 @@ export default async function AlbumDetail({
             <input type="hidden" name="id" value={id} />
             <Field label="Title" name="title" defaultValue={album.title} />
             <TextArea label="Description" name="description" defaultValue={album.description} />
+            <label className="field">
+              <span>Client or Studio Portfolio</span>
+              <select name="client_id" defaultValue={album.client_id || 'studio'}>
+                <option value="studio">✦ Studio Sample Portfolio (Public on website)</option>
+                {clients?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Private Client Album · {c.full_name} ({c.email})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="checkbox-field">
+              <input type="checkbox" name="is_public" defaultChecked={album.is_public ?? false} />
+              Publish on public website (visible to all visitors on homepage and Sample Albums)
+            </label>
+            <Field
+              label="Pixieset gallery URL (optional · Client albums only)"
+              name="pixieset_url"
+              defaultValue={album.pixieset_url || ''}
+              placeholder="https://yourstudio.pixieset.com/clientgallery"
+            />
+            <p className="form-help" style={{ marginTop: '-0.5rem', marginBottom: '1rem', fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
+              Links to an existing Pixieset client gallery. Applicable for client albums only.
+            </p>
+
+            <Field
+              label="Google Drive delivery URL (optional · Client albums only)"
+              name="google_drive_url"
+              defaultValue={album.google_drive_url || ''}
+              placeholder="https://drive.google.com/drive/folders/..."
+            />
+            <p className="form-help" style={{ marginTop: '-0.5rem', marginBottom: '1rem', fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
+              Links to Google Drive for final photo deliveries. Applicable for client albums only.
+            </p>
           </ActionForm>
           <div className="album-cover-settings">
             <h3>Album cover</h3>

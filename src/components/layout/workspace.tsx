@@ -13,6 +13,7 @@ import {
   X,
   UserRound,
   Home,
+  Sparkles,
 } from 'lucide-react';
 import { Brand } from './brand';
 import { logout } from '@/features/auth/actions';
@@ -29,6 +30,7 @@ export function Workspace({
   const links = admin
     ? [
         { href: '/admin', label: 'Overview', icon: LayoutDashboard },
+        { href: '/admin/homepage', label: 'Homepage', icon: Sparkles },
         { href: '/admin/clients', label: 'Clients', icon: Users },
         { href: '/admin/albums', label: 'Albums', icon: Images },
         { href: '/admin/packages', label: 'Collections', icon: Gem },

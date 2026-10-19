@@ -2,7 +2,7 @@
 import { requireAdmin } from '@/lib/auth/session';
 import { revalidatePath } from 'next/cache';
 import { adminClient } from '@/lib/supabase/admin';
-import { check, field, message, uuid } from '@/lib/utils/validation';
+import { check, field, message, uuid, validateGoogleDriveUrl, validatePixiesetUrl } from '@/lib/utils/validation';
 import type { ActionResult } from '@/types/models';
 export async function saveAlbum(_: ActionResult, data: FormData): Promise<ActionResult> {
   const { db } = await requireAdmin();
@@ -11,6 +11,14 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
     const title = field(data, 'title', 180),
       description = String(data.get('description') || '').trim();
     if (description.length > 3000) throw new Error('Description is too long.');
+
+    const pixieset_url = data.has('pixieset_url')
+      ? validatePixiesetUrl(String(data.get('pixieset_url') || ''))
+      : undefined;
+    const google_drive_url = data.has('google_drive_url')
+      ? validateGoogleDriveUrl(String(data.get('google_drive_url') || ''))
+      : undefined;
+
     if (id) {
       uuid(id);
       const cover = String(data.get('cover_image_path') || '') || null;
@@ -23,34 +31,100 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
           .maybeSingle();
         if (!photo) throw new Error('Choose a cover from this album.');
       }
+
+      const { data: currentAlbum } = await db.from('albums').select('client_id').eq('id', id).single();
+
+      let effectiveClientId = currentAlbum?.client_id ?? null;
+      const updatePayload: {
+        title: string;
+        description: string;
+        client_id?: string | null;
+        cover_image_path?: string | null;
+        is_public?: boolean;
+        pixieset_url?: string | null;
+        google_drive_url?: string | null;
+      } = {
+        title,
+        description,
+        ...(data.has('cover_image_path') ? { cover_image_path: cover } : {}),
+        ...(data.has('pixieset_url') ? { pixieset_url } : {}),
+        ...(data.has('google_drive_url') ? { google_drive_url } : {}),
+      };
+
+      if (data.has('client_id')) {
+        const rawClientId = String(data.get('client_id') || '').trim();
+        if (rawClientId === 'studio' || !rawClientId) {
+          effectiveClientId = null;
+          updatePayload.client_id = null;
+        } else {
+          uuid(rawClientId);
+          const { data: client } = await db
+            .from('profiles')
+            .select('id')
+            .eq('id', rawClientId)
+            .eq('role', 'client')
+            .single();
+          if (!client) throw new Error('Choose a valid client or create a studio sample.');
+          effectiveClientId = client.id;
+          updatePayload.client_id = client.id;
+        }
+      }
+
+      if ((pixieset_url || google_drive_url) && effectiveClientId === null) {
+        throw new Error('Studio sample albums cannot have client Pixieset or Google Drive delivery links.');
+      }
+
+      if (data.has('is_public')) {
+        updatePayload.is_public = data.get('is_public') === 'on';
+      }
+
       check(
         (
           await db
             .from('albums')
-            .update({
-              title,
-              description,
-              ...(data.has('cover_image_path') ? { cover_image_path: cover } : {}),
-            })
+            .update(updatePayload)
             .eq('id', id)
         ).error,
       );
+      revalidatePath('/samples');
+      revalidatePath(`/samples/${id}`);
+      revalidatePath('/');
     } else {
-      const client_id = uuid(field(data, 'client_id'));
-      const { data: client } = await db
-        .from('profiles')
-        .select('id')
-        .eq('id', client_id)
-        .eq('role', 'client')
-        .single();
-      if (!client) throw new Error('Choose a valid client.');
+      const rawClientId = String(data.get('client_id') || '').trim();
+      let client_id: string | null = null;
+      if (rawClientId && rawClientId !== 'studio') {
+        uuid(rawClientId);
+        const { data: client } = await db
+          .from('profiles')
+          .select('id')
+          .eq('id', rawClientId)
+          .eq('role', 'client')
+          .single();
+        if (!client) throw new Error('Choose a valid client or create a studio sample.');
+        client_id = client.id;
+      }
+
+      if ((pixieset_url || google_drive_url) && client_id === null) {
+        throw new Error('Studio sample albums cannot have client Pixieset or Google Drive delivery links.');
+      }
+
+      const is_public = data.has('is_public') ? data.get('is_public') === 'on' : true;
       const { data: album, error } = await db
         .from('albums')
-        .insert({ client_id, title, description })
+        .insert({
+          client_id,
+          title,
+          description,
+          is_public,
+          pixieset_url: pixieset_url ?? null,
+          google_drive_url: google_drive_url ?? null,
+        })
         .select('id')
         .single();
       check(error);
       revalidatePath('/admin/albums');
+      revalidatePath('/samples');
+      revalidatePath('/');
       return {
         success: 'Album created. You can now add photographs.',
         id: album!.id,
@@ -58,7 +132,50 @@ export async function saveAlbum(_: ActionResult, data: FormData): Promise<Action
     }
     revalidatePath('/admin/albums');
     revalidatePath(`/admin/albums/${id}`);
+    revalidatePath('/gallery');
+    revalidatePath(`/gallery/${id}`);
+    revalidatePath('/samples');
+    revalidatePath(`/samples/${id}`);
+    revalidatePath('/');
     return { success: 'Album saved.' };
+  } catch (error) {
+    return { error: message(error) };
+  }
+}
+
+export async function togglePublishAlbum(id: string, is_public: boolean): Promise<ActionResult> {
+  const { db } = await requireAdmin();
+  try {
+    uuid(id);
+    check((await db.from('albums').update({ is_public }).eq('id', id)).error);
+    revalidatePath('/admin/albums');
+    revalidatePath(`/admin/albums/${id}`);
+    revalidatePath('/samples');
+    revalidatePath(`/samples/${id}`);
+    revalidatePath('/');
+    return { success: is_public ? 'Album published to public website.' : 'Album is now private.' };
+  } catch (error) {
+    return { error: message(error) };
+  }
+}
+
+export async function togglePhotoPublic(photoId: string, is_public: boolean): Promise<ActionResult> {
+  const { db } = await requireAdmin();
+  try {
+    uuid(photoId);
+    const { data: photo, error: fetchError } = await db
+      .from('photos')
+      .select('album_id')
+      .eq('id', photoId)
+      .single();
+    check(fetchError);
+    if (!photo) throw new Error('Photograph not found.');
+
+    check((await db.from('photos').update({ is_public }).eq('id', photoId)).error);
+
+    revalidatePath(`/admin/albums/${photo.album_id}`);
+    revalidatePath(`/samples/${photo.album_id}`);
+    return { success: is_public ? 'Photo included in public sample.' : 'Photo excluded from public sample.' };
   } catch (error) {
     return { error: message(error) };
   }

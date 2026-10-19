@@ -157,22 +157,24 @@ export function Collections({ packages }: { packages: Package[] }) {
           Promotional prices are subject to availability. Confirm your date and final quote directly
           with Kannan.
         </p>
-        {selected ? (
-          <CoverageCalculator
-            collection={selected}
-            hours={hours}
-            onHours={setHours}
-            service={service}
-            onService={setService}
-          />
-        ) : (
-          <p className="notice info">
-            Contact Kannan for a tailored photography estimate.{' '}
-            <a href={whatsappLink()} className="text-link">
-              Enquire on WhatsApp ↗
-            </a>
-          </p>
-        )}
+        <div id="coverage-calculator">
+          {selected ? (
+            <CoverageCalculator
+              collection={selected}
+              hours={hours}
+              onHours={setHours}
+              service={service}
+              onService={setService}
+            />
+          ) : (
+            <p className="notice info">
+              Contact Kannan for a tailored photography estimate.{' '}
+              <a href={whatsappLink()} className="text-link">
+                Enquire on WhatsApp ↗
+              </a>
+            </p>
+          )}
+        </div>
       </div>
       <PackageGuide packages={packages} />
     </>

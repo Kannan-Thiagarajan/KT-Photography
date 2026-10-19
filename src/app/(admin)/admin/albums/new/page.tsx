@@ -33,39 +33,48 @@ export default async function NewAlbum({
         </div>
       </div>
       <section className="panel account-panel">
-        {clients?.length ? (
-          <ActionForm action={saveAlbum} submit="Create album" redirectBase="/admin/albums">
-            <Field label="Album title" name="title" placeholder="e.g. Wedding day" />
-            <label className="field">
-              <span>Client</span>
-              <select name="client_id" required defaultValue={preferred || ''}>
-                <option value="" disabled>
-                  Select a client
+        <ActionForm action={saveAlbum} submit="Create album" redirectBase="/admin/albums">
+          <Field label="Album title" name="title" placeholder="e.g. Wedding day or Studio Bridal Sample" />
+          <label className="field">
+            <span>Client or Studio Portfolio</span>
+            <select name="client_id" required defaultValue={preferred || ''}>
+              <option value="studio">✦ Studio Sample Album (No client required)</option>
+              {clients?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.full_name} · {c.email}
                 </option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_name} · {c.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <TextArea
-              label="Description (optional)"
-              name="description"
-              placeholder="A short note about this collection of memories."
-            />
-            <p className="form-help">Only the assigned client and you can access this album.</p>
-          </ActionForm>
-        ) : (
-          <EmptyState
-            title="Start with a client."
-            description="Create a client account before making their first album."
-          >
-            <Link href="/admin/clients" className="button button-gold">
-              Add a client
-            </Link>
-          </EmptyState>
-        )}
+              ))}
+            </select>
+          </label>
+          <TextArea
+            label="Description (optional)"
+            name="description"
+            placeholder="A short note about this collection of memories."
+          />
+          <Field
+            label="Pixieset gallery URL (optional)"
+            name="pixieset_url"
+            placeholder="https://yourstudio.pixieset.com/clientgallery"
+          />
+          <p className="form-help" style={{ marginTop: '-0.5rem', marginBottom: '1rem', fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
+            Links to an existing Pixieset client gallery. Does not synchronise gallery content. Applicable for client albums only.
+          </p>
+          <Field
+            label="Google Drive delivery URL (optional)"
+            name="google_drive_url"
+            placeholder="https://drive.google.com/drive/folders/..."
+          />
+          <p className="form-help" style={{ marginTop: '-0.5rem', marginBottom: '1rem', fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
+            Links to Google Drive for final photo delivery. The client may still need permission in Google Drive. Applicable for client albums only.
+          </p>
+          <label className="checkbox-field">
+            <input type="checkbox" name="is_public" />
+            Publish as public sample album (visible to all website visitors · studio samples only)
+          </label>
+          <p className="form-help">
+            Private albums are only visible to the assigned client and you. Public sample albums appear on the public website.
+          </p>
+        </ActionForm>
       </section>
     </>
   );

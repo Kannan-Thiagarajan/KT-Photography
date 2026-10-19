@@ -34,29 +34,38 @@ export type Database = {
       };
       albums: {
         Row: {
-          client_id: string;
+          client_id: string | null;
           cover_image_path: string | null;
           created_at: string;
           description: string;
+          google_drive_url: string | null;
           id: string;
+          is_public: boolean;
+          pixieset_url: string | null;
           title: string;
           updated_at: string;
         };
         Insert: {
-          client_id: string;
+          client_id?: string | null;
           cover_image_path?: string | null;
           created_at?: string;
           description?: string;
+          google_drive_url?: string | null;
           id?: string;
+          is_public?: boolean;
+          pixieset_url?: string | null;
           title: string;
           updated_at?: string;
         };
         Update: {
-          client_id?: string;
+          client_id?: string | null;
           cover_image_path?: string | null;
           created_at?: string;
           description?: string;
+          google_drive_url?: string | null;
           id?: string;
+          is_public?: boolean;
+          pixieset_url?: string | null;
           title?: string;
           updated_at?: string;
         };
@@ -69,6 +78,45 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      homepage_photos: {
+        Row: {
+          alt: string;
+          category: string;
+          created_at: string;
+          display_order: number;
+          id: string;
+          is_active: boolean;
+          label: string;
+          storage_path: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          alt?: string;
+          category?: string;
+          created_at?: string;
+          display_order?: number;
+          id?: string;
+          is_active?: boolean;
+          label?: string;
+          storage_path: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Update: {
+          alt?: string;
+          category?: string;
+          created_at?: string;
+          display_order?: number;
+          id?: string;
+          is_active?: boolean;
+          label?: string;
+          storage_path?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       packages: {
         Row: {
@@ -130,6 +178,7 @@ export type Database = {
           filename: string;
           height: number;
           id: string;
+          is_public: boolean;
           storage_path: string;
           thumbnail_path: string;
           width: number;
@@ -142,6 +191,7 @@ export type Database = {
           filename: string;
           height: number;
           id?: string;
+          is_public?: boolean;
           storage_path: string;
           thumbnail_path: string;
           width: number;
@@ -154,6 +204,7 @@ export type Database = {
           filename?: string;
           height?: number;
           id?: string;
+          is_public?: boolean;
           storage_path?: string;
           thumbnail_path?: string;
           width?: number;

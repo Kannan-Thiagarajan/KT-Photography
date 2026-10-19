@@ -4,8 +4,24 @@ import Link from 'next/link';
 import { Menu, X, ArrowUpRight, LockKeyhole, Phone } from 'lucide-react';
 import { Brand } from './brand';
 import { whatsappLink } from '@/config/brand';
+
 export function PublicNav() {
   const [open, setOpen] = useState(false);
+
+  const handleNavClick = (e: React.MouseEvent, targetId?: string) => {
+    // If we're already on the homepage and have a hash target, smooth-scroll directly
+    if (targetId && typeof window !== 'undefined' && window.location.pathname === '/') {
+      const el = document.getElementById(targetId);
+      if (el) {
+        e.preventDefault();
+        el.scrollIntoView({ behavior: 'smooth' });
+        window.history.pushState(null, '', `/#${targetId}`);
+      }
+    }
+    // Close the mobile menu with a slight delay for touch event reliability
+    setTimeout(() => setOpen(false), 120);
+  };
+
   return (
     <header className="public-header">
       <div className="container nav-inner">
@@ -15,22 +31,25 @@ export function PublicNav() {
           aria-label="Main navigation"
           className={open ? 'main-nav open' : 'main-nav'}
         >
-          <a href="#portfolio" onClick={() => setOpen(false)}>
+          <Link href="/#portfolio" onClick={(e) => handleNavClick(e, 'portfolio')}>
             Our work
-          </a>
-          <a href="#packages" onClick={() => setOpen(false)}>
+          </Link>
+          <Link href="/samples" onClick={(e) => handleNavClick(e)}>
+            Sample albums
+          </Link>
+          <Link href="/#packages" onClick={(e) => handleNavClick(e, 'packages')}>
             Collections
-          </a>
-          <a href="#coverage-calculator" onClick={() => setOpen(false)}>
+          </Link>
+          <Link href="/#coverage-calculator" onClick={(e) => handleNavClick(e, 'coverage-calculator')}>
             Price calculator
-          </a>
-          <a href="#about" onClick={() => setOpen(false)}>
+          </Link>
+          <Link href="/#about" onClick={(e) => handleNavClick(e, 'about')}>
             About
-          </a>
-          <a href="#contact" onClick={() => setOpen(false)}>
+          </Link>
+          <Link href="/#contact" onClick={(e) => handleNavClick(e, 'contact')}>
             Contact
-          </a>
-          <Link href="/login" className="nav-gallery">
+          </Link>
+          <Link href="/login" className="nav-gallery" onClick={(e) => handleNavClick(e)}>
             <LockKeyhole size={14} />
             Client gallery
           </Link>

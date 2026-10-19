@@ -11,9 +11,11 @@ type Upload = {
 export function Uploader({
   albumId,
   onImage,
+  target,
 }: {
   albumId?: string;
   onImage?: (path: string) => void;
+  target?: 'packages' | 'homepage';
 }) {
   const [uploads, setUploads] = useState<Upload[]>([]),
     [busy, setBusy] = useState(false),
@@ -41,6 +43,7 @@ export function Uploader({
           body: JSON.stringify({
             phase: 'prepare',
             albumId,
+            target,
             filename: file.name,
             type: file.type,
             size: file.size,
