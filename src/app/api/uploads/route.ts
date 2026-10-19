@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       const max = albumId ? 25 * 1024 * 1024 : 8 * 1024 * 1024;
       if (!types[type] || !Number.isInteger(size) || size < 1 || size > max)
         throw new Error(`Upload JPG, PNG or WebP images under ${max / 1024 / 1024} MB.`);
-      let clientId = '';
+      let clientId = 'studio';
       if (albumId) {
         const { data: album, error } = await session.db
           .from('albums')
@@ -40,11 +40,12 @@ export async function POST(request: Request) {
           .single();
         check(error);
         if (!album) throw new Error('Album not found.');
-        clientId = album.client_id;
+        clientId = album.client_id || 'studio';
       }
+      const target = input.target === 'homepage' ? 'homepage' : 'packages';
       const path = albumId
         ? `${clientId}/${albumId}/${randomUUID()}.${types[type]}`
-        : `packages/${randomUUID()}.${types[type]}`;
+        : `${target}/${randomUUID()}.${types[type]}`;
       const { data, error } = await db.storage.from(bucket).createSignedUploadUrl(path);
       check(error);
       check(
@@ -134,7 +135,8 @@ export async function POST(request: Request) {
         .select('id,client_id,cover_image_path')
         .eq('id', ticket.albumId)
         .single();
-      if (!album || !ticket.path.startsWith(`${album.client_id}/${album.id}/`))
+      const clientPrefix = album?.client_id || 'studio';
+      if (!album || !ticket.path.startsWith(`${clientPrefix}/${album.id}/`))
         throw new Error('Album is no longer available.');
       check(
         (

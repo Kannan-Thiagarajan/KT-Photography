@@ -10,25 +10,42 @@ export type Profile = {
 };
 export type Album = {
   id: string;
-  client_id: string;
+  client_id: string | null;
   title: string;
   description: string;
   cover_image_path: string | null;
+  is_public?: boolean;
+  pixieset_url?: string | null;
+  google_drive_url?: string | null;
   created_at: string;
   updated_at: string;
 };
 export type Photo = {
   id: string;
   album_id: string;
-  storage_path: string;
+  storage_path?: string;
   thumbnail_path: string;
   filename: string;
   file_size: number;
   width: number;
   height: number;
   display_order: number;
+  is_public?: boolean;
   preview_url?: string;
   created_at: string;
+};
+export type HomepagePhoto = {
+  id: string;
+  storage_path: string;
+  url?: string;
+  title: string;
+  alt: string;
+  label: string;
+  category: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 export type Package = {
   id: string;

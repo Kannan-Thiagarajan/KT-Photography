@@ -32,3 +32,53 @@ export function message(error: unknown) {
 export function check(error: { message: string } | null) {
   if (error) throw new Error(error.message);
 }
+
+export function validatePixiesetUrl(rawUrl: string | null | undefined): string | null {
+  const value = String(rawUrl || '').trim();
+  if (!value) return null;
+  if (value.length > 2000) throw new Error('Pixieset gallery URL is too long.');
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Please enter a valid Pixieset gallery URL.');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Pixieset gallery URL must use a secure HTTPS connection.');
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const isValidHost = hostname === 'pixieset.com' || hostname.endsWith('.pixieset.com');
+  if (!isValidHost || parsed.username || parsed.password) {
+    throw new Error('Please enter a valid Pixieset gallery URL (e.g., https://yourstudio.pixieset.com/galleryname).');
+  }
+
+  return parsed.toString();
+}
+
+export function validateGoogleDriveUrl(rawUrl: string | null | undefined): string | null {
+  const value = String(rawUrl || '').trim();
+  if (!value) return null;
+  if (value.length > 2000) throw new Error('Google Drive URL is too long.');
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Please enter a valid Google Drive URL.');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Google Drive URL must use a secure HTTPS connection.');
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const isValidHost = hostname === 'drive.google.com' || hostname === 'docs.google.com';
+  if (!isValidHost || parsed.username || parsed.password) {
+    throw new Error('Please enter a valid Google Drive link (e.g., https://drive.google.com/drive/folders/...).');
+  }
+
+  return parsed.toString();
+}
