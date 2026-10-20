@@ -12,9 +12,9 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
     .from('profiles')
     .select('*')
     .eq('id', id)
-    .eq('role', 'client')
     .maybeSingle();
   if (error || !client) notFound();
+  const isAdmin = client.role === 'admin';
   const { data: albums, error: albumError } = await db
     .from('albums')
     .select('id,title,photos(count)')
@@ -25,18 +25,20 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
     <>
       <Link href="/admin/clients" className="back-link">
         <ArrowLeft size={14} />
-        All clients
+        All users & clients
       </Link>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">CLIENT PROFILE</p>
+          <p className="eyebrow">{isAdmin ? 'ADMINISTRATOR PROFILE' : 'CLIENT PROFILE'}</p>
           <h1>{client.full_name}</h1>
           <p>{client.email}</p>
         </div>
-        <Link href={`/admin/albums/new?client=${id}`} className="button button-gold">
-          <Plus size={16} />
-          New album
-        </Link>
+        {!isAdmin && (
+          <Link href={`/admin/albums/new?client=${id}`} className="button button-gold">
+            <Plus size={16} />
+            New album
+          </Link>
+        )}
       </div>
       <div className="management-grid">
         <section className="panel">
@@ -49,9 +51,16 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
               <Field label="Full name" name="full_name" defaultValue={client.full_name} />
               <Field label="Email address" name="email" type="email" defaultValue={client.email} />
             </div>
+            <label className="field">
+              <span>Account role</span>
+              <select name="role" defaultValue={client.role}>
+                <option value="client">Client (Private Gallery Access)</option>
+                <option value="admin">Administrator (Studio & Admin Access)</option>
+              </select>
+            </label>
             <label className="checkbox-field">
               <input type="checkbox" name="is_active" defaultChecked={client.is_active} />
-              Allow client to access their galleries
+              Allow user to sign in to the studio / gallery
             </label>
             <Field
               label="Reset password (optional)"
@@ -62,21 +71,32 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
               placeholder="Leave blank to keep current password"
             />
             <p className="form-help">
-              Use 12–128 characters with uppercase, lowercase and a number. A reset requires the
-              client to change their password again. Share new credentials privately; no email is
+              Use 12–128 characters with uppercase, lowercase and a number. Share new credentials privately; no email is
               sent.
             </p>
           </ActionForm>
           <p className="detail-note">
-            Disabling access blocks this client’s galleries, downloads and database access. Existing
-            signed photo links expire within 60 seconds.
+            Disabling access blocks this user from signing in or viewing private resources.
           </p>
         </section>
         <section className="panel">
           <div className="panel-heading">
-            <h2>Assigned albums</h2>
+            <h2>{isAdmin ? 'Administrator privileges' : 'Assigned albums'}</h2>
           </div>
-          {albums?.length ? (
+          {isAdmin ? (
+            <div style={{ padding: '0.5rem 0', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <p style={{ color: 'var(--text-muted)' }}>
+                This user has full <strong>Administrator</strong> privileges across KT Photography studio.
+              </p>
+              <ul style={{ paddingLeft: '1.25rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
+                <li>Full access to client directory & private galleries</li>
+                <li>Upload and manage albums & photographs</li>
+                <li>Configure pricing packages and quotations</li>
+                <li>Curate homepage showcase photos and sample albums</li>
+                <li>Invite and manage other studio administrators</li>
+              </ul>
+            </div>
+          ) : albums?.length ? (
             albums.map((a) => (
               <Link href={`/admin/albums/${a.id}`} key={a.id} className="recent-row">
                 <div>
