@@ -154,6 +154,8 @@ export function Showcase({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [isTouching, setIsTouching] = useState(false);
+  const [isInView, setIsInView] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
 
   const isReducedMotion = useSyncExternalStore(
@@ -163,6 +165,26 @@ export function Showcase({
   );
 
   const trackRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Only run carousel auto-advance when the showcase is actually visible in the viewport
+  useEffect(() => {
+    const target = sectionRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      setIsInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0.15 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
 
   const filtered = useMemo(
     () => photos.filter((p) => filter === 'All' || p.category === filter),
@@ -171,14 +193,20 @@ export function Showcase({
 
   const scrollToSlide = useCallback(
     (index: number) => {
-      if (!trackRef.current) return;
-      const slides = trackRef.current.children;
+      const track = trackRef.current;
+      if (!track) return;
+      const slides = track.children;
       if (slides[index]) {
         const slide = slides[index] as HTMLElement;
-        slide.scrollIntoView({
+        // Scroll strictly inside the horizontal track container.
+        // NEVER call slide.scrollIntoView which hijacks the entire window/page scroll!
+        const slideLeft = slide.offsetLeft;
+        const slideWidth = slide.offsetWidth;
+        const trackWidth = track.clientWidth;
+        const targetScrollLeft = slideLeft - (trackWidth - slideWidth) / 2;
+        track.scrollTo({
+          left: Math.max(0, targetScrollLeft),
           behavior: isReducedMotion ? 'auto' : 'smooth',
-          block: 'nearest',
-          inline: 'center',
         });
         setCurrentIndex(index);
       }
@@ -237,9 +265,17 @@ export function Showcase({
     }
   }, [currentIndex]);
 
-  // Handle automatic carousel movement
+  // Handle automatic carousel movement — only when visible, not hovered, not touched, not focused
   useEffect(() => {
-    if (!isPlaying || isHovered || isFocused || isReducedMotion || filtered.length <= 1) {
+    if (
+      !isPlaying ||
+      !isInView ||
+      isHovered ||
+      isFocused ||
+      isTouching ||
+      isReducedMotion ||
+      filtered.length <= 1
+    ) {
       return;
     }
 
@@ -248,7 +284,16 @@ export function Showcase({
     }, 4500);
 
     return () => clearInterval(timer);
-  }, [isPlaying, isHovered, isFocused, isReducedMotion, filtered.length, handleNext]);
+  }, [
+    isPlaying,
+    isInView,
+    isHovered,
+    isFocused,
+    isTouching,
+    isReducedMotion,
+    filtered.length,
+    handleNext,
+  ]);
 
   // Keyboard controls
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -265,6 +310,7 @@ export function Showcase({
 
   return (
     <section
+      ref={sectionRef}
       className="showcase-section"
       aria-roledescription="carousel"
       aria-label="Through the Lens photography portfolio"
@@ -274,6 +320,9 @@ export function Showcase({
       onBlur={() => setIsFocused(false)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onTouchStart={() => setIsTouching(true)}
+      onTouchEnd={() => setIsTouching(false)}
+      onTouchCancel={() => setIsTouching(false)}
     >
       {/* Category filter tabs */}
       <div className="filter-tabs portfolio-filters" role="tablist" aria-label="Filter portfolio categories">

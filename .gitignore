@@ -10,3 +10,6 @@ mcp.json
 playwright-report/
 test-results/
 .vercel/
+
+.vercel
+.env*

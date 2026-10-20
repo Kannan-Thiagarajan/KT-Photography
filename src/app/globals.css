@@ -648,6 +648,7 @@ ul {
   display: flex;
   gap: 20px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
